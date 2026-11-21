@@ -28,7 +28,10 @@ button,select,input{background:#1a2030;color:#d6dae3;border:1px solid #2a3248;bo
 button{cursor:pointer}
 #ttl{font-weight:700;font-size:16px}
 #st{font-size:12px;color:#ef5350}#st.on{color:#26a69a}
-#panel{display:none;gap:12px;align-items:center;padding:8px 10px;background:#0f131b;border-bottom:1px solid #1c2230;flex-wrap:wrap}
+#panel{display:none;gap:10px;align-items:stretch;padding:8px 10px;background:#0f131b;border-bottom:1px solid #1c2230;flex-wrap:wrap;max-height:62vh;overflow-y:auto}
+#panel .ptop{flex-basis:100%;display:flex;align-items:center;gap:8px}#panel .ptop span{flex:1}
+#panel .sec{flex:1 1 300px;display:flex;flex-wrap:wrap;gap:8px 14px;align-content:flex-start;border:1px solid #232a3a;border-radius:10px;padding:8px 10px 10px;background:#121722}
+#panel .sec h4{flex-basis:100%;margin:0;font-size:12px;font-weight:700;color:#d6dae3;letter-spacing:.3px}
 #panel label{display:flex;gap:6px;align-items:center;font-size:13px;color:#aab2c5}
 #panel input[type=number]{width:110px}
 #wrap{display:flex;flex:1;min-height:0}
@@ -51,7 +54,19 @@ button{cursor:pointer}
 #side .m{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:center;column-gap:8px;padding:4px 8px;background:#1a2030;border-top:1px solid #2a3142;border-bottom:1px solid #2a3142}
 #side .m b{font-size:14px}#side .m small{color:#8b93a7;font-size:11px;font-weight:400}
 #side .bal{flex-basis:100%;display:flex;height:3px;margin-top:3px;border-radius:2px;overflow:hidden}#side .bal i{background:#26a69a}#side .bal u{flex:1;background:#ef5350}
-#ladb.on{background:#2a2e39;color:#2962ff}
+#ladb.on,#patb.on{background:#2a2e39;color:#2962ff}
+#dbar{display:none;gap:4px;align-items:center;flex-wrap:wrap;padding:6px 8px;background:#0f131b;border-bottom:1px solid #1c2230}
+#dbar .dt{display:flex;flex-direction:column;align-items:center;min-width:46px;padding:4px 6px;font-size:16px;line-height:1.1}
+#dbar .dt small{font-size:9px;color:#8b93a7;margin-top:2px;max-width:76px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#dbar .dt.on{background:#2a2e39;color:#2962ff}#dbar .dsep{width:1px;height:28px;background:#2a3142;margin:0 4px}#dbar input{width:110px}
+#dbar .dhint{color:#ffd54f;font-size:12px;flex-basis:100%}
+.dc{width:22px;height:22px;min-width:22px;border-radius:50%;border:2px solid #0f131b;padding:0}.dc.on{border-color:#fff}
+#ipanel{display:none;padding:8px 10px;background:#0f131b;border-bottom:1px solid #1c2230;max-height:50vh;overflow:auto}
+#ipanel .ih{display:flex;align-items:center;gap:8px;margin-bottom:6px}#ipanel .ih span{flex:1}
+#ipanel .ir{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid #1c2230}
+#ipanel .ir input{width:64px}#ipanel label{display:flex;gap:4px;align-items:center;font-size:12px;color:#aab2c5}
+#ipanel .sw{display:flex;gap:4px}#ipanel .ia{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}#ipanel .ie{color:#8b93a7;font-size:13px}
+#drb.on,#indb.on{background:#2a2e39;color:#2962ff}
 #toast{position:fixed;left:50%;top:54px;transform:translateX(-50%);background:#1a2030;border:1px solid #ffd54f;color:#fff;padding:8px 14px;border-radius:20px;font-size:13px;z-index:60;display:none;max-width:90%;text-align:center;cursor:pointer}
 @media(max-width:640px){#wrap{flex-direction:column}#side{width:auto;height:40%;border-left:0;border-top:1px solid #1c2230}}
 #bub{position:absolute;inset:0;display:flex;flex-direction:column;background:var(--bg,#0b0e14)}
@@ -114,17 +129,42 @@ body.th2,body.th2 #bub,body.th2 .ov{--bg:#000;background:#000}
 <div id="cv">
   <div id="bar">
     <button id="back">←</button><span id="ttl"></span><span id="st">● нет связи</span><span id="dbg"></span>
-    <div id="tfs"><button data-tf="1m">1м</button><button data-tf="5m">5м</button><button data-tf="15m">15м</button><button data-tf="1h">1Ч</button><button data-tf="4h">4Ч</button><button data-tf="1d">1Д</button></div>
-    <button id="ladb">Стакан</button><button id="gear">⚙ Настройки</button><button id="vw">TradingView</button>
+    <div id="tfs"><button data-tf="1m">1м</button><button data-tf="5m">5м</button><button data-tf="15m">15м</button><button data-tf="1h">1Ч</button><button data-tf="4h">4Ч</button><button data-tf="1d">1Д</button><button data-tf="1w">1Н</button></div>
+    <button id="ladb">Стакан</button><button id="patb">Фигуры</button><button id="drb">✏ Рисование</button><button id="indb">ƒx Индикаторы</button><button id="gear">⚙ Настройки</button><button id="vw">TradingView</button>
   </div>
-  <div id="panel"><b id="pn"></b>
-    <label>Линии <select id="amode"><option value="auto">Авто: где крупные деньги</option><option value="top">Топ по объёму</option></select></label>
-    <label>Чувствительность <select id="asens"><option value="3">высокая (×3)</option><option value="5">средняя (×5)</option><option value="8">только огромные (×8)</option></select></label>
-    <label>Мин. размер $ <input id="minUsd" type="number" min="0" step="10000" placeholder="авто (топ)"></label>
-    <label>Шаг кластера <select id="bucket"><option>0.02</option><option>0.05</option><option>0.1</option><option>0.25</option><option>0.5</option><option>1</option></select>%</label>
-    <label>Диапазон ±<select id="range"><option>1</option><option>2</option><option>5</option><option>10</option><option>20</option><option>50</option><option value="100">100 (весь)</option></select>%</label>
-    <label><input id="sb" type="checkbox"> Покупки</label>
-    <label><input id="sa" type="checkbox"> Продажи</label><label>Линий на сторону <input id="topn" type="number" min="1" max="50" style="width:60px"></label><label><input id="sprof" type="checkbox"> Профиль стакана</label><label><input id="sfit" type="checkbox"> Показать весь стакан</label><label><input id="slad" type="checkbox"> Лента стакана</label><label><input id="stb" type="checkbox"> Таблица объёма</label><label>Периоды <input id="tper" type="text" style="width:150px" placeholder="24ч,12ч,4ч,1ч"></label><label><input id="tnat" type="checkbox"> NATR, длина <input id="tnl" type="number" min="2" max="100" style="width:60px"></label><label>Размер <select id="tsz"><option value="0.8">Мелкий</option><option value="1">Средний</option><option value="1.3">Крупный</option></select></label><button id="tpos">Таблицу вправо</button><button id="rst">Сбросить</button>
+  <div id="dbar"></div><div id="ipanel"></div>
+  <div id="panel">
+    <div class="ptop"><b id="pn"></b><span></span><button id="rst">Сбросить всё</button><button id="pclose">✕</button></div>
+    <div class="sec"><h4>📈 График</h4>
+      <label>История <select id="hist"><option value="week">Неделя</option><option value="month">Месяц</option><option value="year">Год</option></select></label>
+    </div>
+    <div class="sec"><h4>🐋 Линии китов на графике</h4>
+      <label>Режим <select id="amode"><option value="auto">Авто: где крупные деньги</option><option value="top">Топ по объёму</option></select></label>
+      <label>Чувствительность <select id="asens"><option value="3">высокая (×3)</option><option value="5">средняя (×5)</option><option value="8">только огромные (×8)</option></select></label>
+      <label>Линий на сторону <input id="topn" type="number" min="1" max="50" style="width:60px"></label>
+      <label>Мин. сумма $ <input id="minUsd" type="number" min="0" step="10000" placeholder="не задано"></label>
+      <label><input id="sb" type="checkbox"> Покупки</label><label><input id="sa" type="checkbox"> Продажи</label>
+    </div>
+    <div class="sec"><h4>📊 Стакан</h4>
+      <label><input id="slad" type="checkbox"> Лента стакана (справа / снизу)</label>
+      <label><input id="sprof" type="checkbox"> Профиль стакана на графике</label>
+      <label><input id="sfit" type="checkbox"> Вместить весь стакан в график</label>
+      <label>Шаг кластера <select id="bucket"><option>0.02</option><option>0.05</option><option>0.1</option><option>0.25</option><option>0.5</option><option>1</option></select>%</label>
+      <label>Диапазон ±<select id="range"><option>1</option><option>2</option><option>5</option><option>10</option><option>20</option><option>50</option><option value="100">100 (весь)</option></select>%</label>
+    </div>
+    <div class="sec"><h4>△ Фигуры теханализа</h4>
+      <label><input id="pt" type="checkbox"> Показывать фигуры</label>
+      <label>Таймфрейм <select id="ptf"><option value="1h">1 час</option><option value="4h">4 часа</option><option value="1d">1 день</option><option value="1w">1 неделя</option><option value="chart">как на графике</option></select></label>
+      <label><input id="ptl" type="checkbox"> Линии тренда</label><label><input id="ptr" type="checkbox"> Треугольники и клинья</label><label><input id="pfl" type="checkbox"> Флаги</label>
+      <label><input id="pac" type="checkbox"> Накопление / пробой</label><label><input id="pcu" type="checkbox"> Чаша с ручкой</label><label><input id="pdb" type="checkbox"> Двойная вершина / дно</label>
+    </div>
+    <div class="sec"><h4>📋 Таблица объёма</h4>
+      <label><input id="stb" type="checkbox"> Показывать</label>
+      <label>Периоды <input id="tper" type="text" style="width:130px" placeholder="24ч,12ч,4ч,1ч"></label>
+      <label><input id="tnat" type="checkbox"> NATR, длина <input id="tnl" type="number" min="2" max="100" style="width:56px"></label>
+      <label>Размер <select id="tsz"><option value="0.8">Мелкий</option><option value="1">Средний</option><option value="1.3">Крупный</option></select></label>
+      <button id="tpos">Таблицу вправо</button>
+    </div>
   </div>
   <div id="wrap"><div id="main"><div id="chart"></div><canvas id="ov"></canvas><div id="lg"></div><div id="stat"></div><div id="tvw"></div></div><div id="side"></div></div>
 </div>
@@ -172,7 +212,7 @@ async function viaWs(path){
     wsaBig('ticker.24hr',{},12000).then(win,lose);
     setTimeout(()=>{if(!done)accumMini('wss://stream.binance.com:9443/ws/!miniTicker@arr',4000,0).then(win,lose)},5000);
   });
-  if(n==='/api/v3/klines')return wsaCall('klines',{symbol:q.symbol,interval:q.interval,limit:+q.limit});
+  if(n==='/api/v3/klines')return (q.endTime||+q.limit>=400?wsaDep:wsaCall)('klines',Object.assign({symbol:q.symbol,interval:q.interval,limit:+q.limit},q.endTime?{endTime:+q.endTime}:{}),6000);
   if(n==='/api/v3/depth')return wsaDep('depth',{symbol:q.symbol,limit:+q.limit},10000);
   if(n==='/api/v3/ticker')return wsaDep('ticker',{symbol:q.symbol,windowSize:q.windowSize});
   throw new Error('no ws route');
@@ -183,12 +223,12 @@ async function viaWsF(path){
   if(n==='/fapi/v1/ticker/24hr')return accumMini(FWS+'/market/ws/!miniTicker@arr',4000,100);
   if(n==='/fapi/v1/depth')return wsfCall('depth',{symbol:q.symbol,limit:Math.min(1000,+q.limit||1000)},12000);
   if(n==='/fapi/v1/klines'){
-    const [ss,f]=FSP(q.symbol),k=await wsaCall('klines',{symbol:ss,interval:q.interval,limit:+q.limit});
+    const [ss,f]=FSP(q.symbol),k=await (q.endTime||+q.limit>=400?wsaDep:wsaCall)('klines',Object.assign({symbol:ss,interval:q.interval,limit:+q.limit},q.endTime?{endTime:+q.endTime}:{}),6000);
     const r=f===1?k:k.map(r=>{const x=r.slice();for(let i=1;i<=4;i++)x[i]=String(+r[i]*f);return x});
     /* спот-пара может быть делистнута или означать другую монету с тем же тикером: такие свечи не берём */
     if(r.length){const L=r[r.length-1],im={'1m':6e4,'3m':18e4,'5m':3e5,'15m':9e5,'30m':18e5,'1h':36e5,'2h':72e5,'4h':144e5,'1d':864e5,'1w':6048e5}[q.interval]||864e5,c=coins.get(q.symbol);
-      if(Date.now()-L[0]>3*im)throw new Error('spot stale');
-      if(c&&c.p&&Math.abs(+L[4]/c.p-1)>.03)throw new Error('spot!=fut')}
+      if(!q.endTime&&Date.now()-L[0]>3*im)throw new Error('spot stale');
+      if(!q.endTime&&c&&c.p&&Math.abs(+L[4]/c.p-1)>.03)throw new Error('spot!=fut')}
     return r;
   }
   throw new Error('no ws route');
@@ -208,14 +248,18 @@ async function bjf(path,restOnly){
   }
   try{return await viaWsF(path)}catch(e){throw new Error('net')}
 }
-const apiK=(m,sym,iv,lim)=>m==='fut'?bjf(`/fapi/v1/klines?symbol=${sym}&interval=${iv}&limit=${lim}`):bj(`/api/v3/klines?symbol=${sym}&interval=${iv}&limit=${lim}`);
+const apiK=(m,sym,iv,lim,end)=>{const e=end?'&endTime='+end:'';return m==='fut'?bjf(`/fapi/v1/klines?symbol=${sym}&interval=${iv}&limit=${lim}${e}`):bj(`/api/v3/klines?symbol=${sym}&interval=${iv}&limit=${lim}${e}`)};
+/* длинная история: несколько запросов по 1000 свечей назад во времени */
+async function kHist(m,sym,tf,bars,end0){let out=[],end=end0||0;while(out.length<bars){const n=Math.min(1000,bars-out.length);let k=null;
+  for(let a=0;a<3&&!k;a++){try{k=await apiK(m,sym,tf,n,end)}catch(e){if(a===2){if(out.length)return out;throw e}await new Promise(r=>setTimeout(r,400))}}
+  if(!k.length)break;out=k.concat(out);if(k.length<n)break;end=k[0][0]-1}return out}
 const apiD=(m,sym,lim)=>m==='fut'?bjf(`/fapi/v1/depth?symbol=${sym}&limit=${Math.min(lim,1000)}`):bj(`/api/v3/depth?symbol=${sym}&limit=${lim}`);
 const STB=new Set(['USDC','FDUSD','TUSD','USDP','EUR','EURI','AEUR','DAI','USDE','XUSD','USD1','RLUSD','U','RWUSD','BFUSD','USDS','PYUSD','USDG','EURC','UST','SUSD','BUSD','USDD','USDJ','FRAX','LUSD','GUSD','CUSD','GBP','AUD','BRL','TRY','RUB','UAH','JPY','CAD','ARS','PLN','RON','CZK','MXN','COP']);
 const STK=new Set('MU MUU TSLA NBIS NFLX NVDA SNDK SOXL SOXS MRVL MSTR SKHY SNXX TQQQ SQQQ AAPL INTC KORU AXTI SPCX CBRS HOOD CRCL LITE MSFT AMD AMZN GOOGL GOOG AAOI COIN PLTR SPY QQQ IWM SKUU META DRAM ORCL DELL COHR CRDO ARM AVGO VST ALAB EWY USAR AMAT BMNR TSM BABA UBER GLD SLV SMCI CRWV RDDT GME AMC MARA RIOT CLSK IREN CIFR WULF CRWD PANW ADBE CRM PYPL SHOP DIS NKE WMT COST JPM BAC GS XOM LLY UNH RIVN NIO ASML QCOM TXN IBM CSCO INTU SNOW ABNB DASH SBET GLXY OKLO SMR RKLB ASTS IONQ RGTI QBTS SOFI HIMS TEM CEG GEV VRT ANET MDB DDOG XAU XAG XPT XPD ANT SKHYNIX SAMSUNG CL BZ NATGAS UVXY SKDD MVLL INTW BE TTWO WDC MSTU NVDL TSLL CONL ZHIPU STRC GLW OPENAI ZHONGJI MINIMAX CXMT MRNA SOXX SMH NOK FLNC DJT AGPU CYPH FWDI PDD SHAZ KSTR SECZ BRK'.split(' '));
 const isStock=c=>/tokeni[sz]ed|xstock|bstocks/i.test(c.nm||'')||(c.n.length>=3&&c.n.endsWith('B')&&STK.has(c.n.slice(0,-1)))||(AS.mkt==='fut'&&(STK.has(c.n)||/^CSOP|\d[LS]$/.test(c.n)))||(c.n.length>=4&&c.n.endsWith('B')&&!c.rk&&c.p>=1&&!/^(BNB|ARB|SHIB|TRB|ORB|KUB|SUB|PNUTB)$/.test(c.n));
 const isStable=c=>STB.has(c.n)||(c.p>.985&&c.p<1.015&&c.h>0&&(c.h-c.l)/c.p<.006);
-const DEF={tper:'24ч,12ч,4ч,1ч',tnat:true,tnl:14,tsz:1,tpos:null,tbl:true,view:'own',tf:'15m',minUsd:0,bucket:0.1,range:5,bids:true,asks:true,top:8,prof:true,fit:false,lad:true,lg:0,am:'auto',as:5};
-let S={view:'own',tf:'15m',minUsd:0,bucket:0.1,range:5,bids:true,asks:true,top:8,prof:true,fit:false,lad:true,lg:0,am:'auto',as:5};
+const DEF={tper:'24ч,12ч,4ч,1ч',tnat:true,tnl:14,tsz:1,tpos:null,tbl:true,view:'own',tf:'15m',minUsd:0,bucket:0.1,range:5,bids:true,asks:true,top:8,prof:true,fit:false,lad:true,lg:0,am:'auto',as:5,pt:true,ptl:true,ptr:true,pfl:true,pac:true,pcu:true,pdb:true,ptf:'4h',hist:'month'};
+let S={view:'own',tf:'15m',minUsd:0,bucket:0.1,range:5,bids:true,asks:true,top:8,prof:true,fit:false,lad:true,lg:0,am:'auto',as:5,pt:true,ptl:true,ptr:true,pfl:true,pac:true,pcu:true,pdb:true,ptf:'4h',hist:'month'};
 try{Object.assign(S,JSON.parse(localStorage.getItem('cbw')||'{}'))}catch(e){}
 const save=()=>{try{const j=JSON.stringify(S);localStorage.setItem('cbw',j);if(cur)localStorage.setItem('cbw:'+cur,j)}catch(e){}};
 
@@ -641,7 +685,11 @@ $('#coin').oninput=e=>{
   else if(e.target.id==='cv2'){const v=$('#cv1');if(v)v.value=isNaN(a)||!CC.p?'':cm(String(+(a/CC.p).toFixed(8)))}
 };
 window.cbBack=()=>{
-  if($('#cv').style.display==='flex'){$('#back').click();return 1}
+  if($('#cv').style.display==='flex'){
+    if($('#ipanel').style.display==='block'){$('#indb').click();return 1}
+    if($('#panel').style.display==='flex'){$('#panel').style.display='none';return 1}
+    if($('#dbar').style.display==='flex'){$('#drb').click();return 1}
+    $('#back').click();return 1}
   if($('#coin').style.display==='block'){closeCoin();return 1}
   for(const id of ['#spanel','#lst','#cpanel','#menu']){const e=$(id);if(e.style.display==='block'){e.style.display='none';return 1}}
   return 0;
@@ -654,9 +702,10 @@ const ov=$('#ov'),ox=ov.getContext('2d');
 function setStatus(on){const s=$('#st');s.textContent=on?'● онлайн':'● нет связи';s.className=on?'on':''}
 function closeSock(){clearInterval(pollT);clearInterval(statT);if(sock){sock.onclose=null;sock.onmessage=null;try{sock.close()}catch(e){}sock=null}if(sock2){sock2.onclose=null;sock2.onmessage=null;try{sock2.close()}catch(e){}sock2=null}setStatus(false)}
 
-const TFL={'1m':'1м','5m':'5м','15m':'15м','1h':'1Ч','4h':'4Ч','1d':'1Д'};
+const TFL={'1m':'1м','5m':'5м','15m':'15м','1h':'1Ч','4h':'4Ч','1d':'1Д','1w':'1Н'};
 function markTf(){document.querySelectorAll('#tfs button').forEach(b=>b.classList.toggle('on',b.dataset.tf===S.tf))}
-function legend(p){
+function legend(p){if(!lastC&&!(p&&p.seriesData&&p.seriesData.get(series)))return;legend0(p);try{$('#lg').insertAdjacentHTML('beforeend',indLeg(p))}catch(e){}}
+function legend0(p){
   let c=p&&p.seriesData&&p.seriesData.get(series);if(!c)c=lastC;if(!c)return;
   const ch=(c.close/c.open-1)*100,k=c.close>=c.open?'up':'dn',f=v=>v.toFixed(prec);
   $('#lg').innerHTML=`<b>${cur.replace('USDT','/USDT')}</b> · ${TFL[S.tf]} · Binance${CM==='fut'?' Фьючерсы':''}<br><span>O</span><i class="${k}">${f(c.open)}</i><span>H</span><i class="${k}">${f(c.high)}</i><span>L</span><i class="${k}">${f(c.low)}</i><span>C</span><i class="${k}">${f(c.close)}</i> <i class="${k}">${(ch>=0?'+':'')+ch.toFixed(2)}%</i>`;
@@ -677,32 +726,46 @@ async function openChart(sym,view){
       autoscaleInfoProvider:o=>{const r=o();if(!S.fit||!bookLo||!bookHi||!r||!r.priceRange)return r;return{priceRange:{minValue:Math.min(r.priceRange.minValue,bookLo),maxValue:Math.max(r.priceRange.maxValue,bookHi)},margins:r.margins}}});
     vol=chart.addHistogramSeries({priceFormat:{type:'volume'},priceScaleId:'vol',lastValueVisible:false,priceLineVisible:false});
     chart.priceScale('vol').applyOptions({scaleMargins:{top:.82,bottom:0}});
+    rebuildInd();
     chart.subscribeCrosshairMove(legend);
   }
   chart.applyOptions({watermark:{visible:true,fontSize:48,horzAlign:'center',vertAlign:'center',color:'rgba(120,123,134,.12)',text:sym.replace('USDT','/USDT')}});
   load();
 }
 async function load(){
-  closeSock();stats={};bids.clear();asks.clear();list=[];fading=[];seen.clear();synced=false;bookU=0;needSnap=false;prof=[];bookLo=bookHi=0;sideInit=false;{const sd=$('#side');sd._k=0;sd.innerHTML='<div class="h">Стакан загружается…</div>'}
+  closeSock();stats={};bids.clear();asks.clear();list=[];fading=[];seen.clear();synced=false;bookU=0;needSnap=false;PATS=[];patT=0;PC=null;pcKey='';prof=[];bookLo=bookHi=0;sideInit=false;{const sd=$('#side');sd._k=0;sd.innerHTML='<div class="h">Стакан загружается…</div>'}
   const sym=cur,tf=S.tf,my=++gen,s=sym.toLowerCase();
   let k;
-  try{k=await apiK(CM,sym,tf,500)}catch(e){
+  const TS={'1m':60,'5m':300,'15m':900,'1h':3600,'4h':14400,'1d':86400,'1w':604800}[tf]||60,HD={week:7,month:30,year:365}[S.hist]||30;
+  const need=Math.max(400,Math.min(5000,Math.ceil(HD*86400/TS)+20));
+  /* сначала быстро грузим последние 1000 свечей, остальную историю — фоном */
+  try{k=await kHist(CM,sym,tf,Math.min(1000,need));if(!k.length)throw 0}catch(e){
     const pp=(coins.get(sym)||{}).p;
     if(CM!=='fut'||!pp)return setTimeout(()=>my===gen&&load(),2000);
-    const sc={'1m':60,'5m':300,'15m':900,'1h':3600,'4h':14400,'1d':86400}[tf]||60,t0=Math.floor(Date.now()/1000/sc)*sc*1000;k=[[t0,pp,pp,pp,pp,0]];
+    const sc=TS,t0=Math.floor(Date.now()/1000/sc)*sc*1000;k=[[t0,pp,pp,pp,pp,0]];
   }
   if(my!==gen)return;
   const last=+k[k.length-1][4],p=last>=1000?2:last>=1?4:last>=.01?6:8;
   series.applyOptions({priceFormat:{type:'price',precision:p,minMove:1/10**p}});
-  prec=p;candles=k.map(r=>({t:r[0]/1000,h:+r[2],l:+r[3],c:+r[4]}));{const q=k[k.length-1];lastC={time:q[0]/1000,open:+q[1],high:+q[2],low:+q[3],close:+q[4]}}vol.setData(k.map(r=>({time:r[0]/1000,value:+r[5],color:+r[4]>=+r[1]?'rgba(38,166,154,.5)':'rgba(239,83,80,.5)'})));legend();series.setData(k.map(r=>({time:r[0]/1000,open:+r[1],high:+r[2],low:+r[3],close:+r[4]})));
-  chart.timeScale().scrollToRealTime();
+  prec=p;candles=k.map(r=>({t:r[0]/1000,o:+r[1],h:+r[2],l:+r[3],c:+r[4],v:+r[5]}));{const q=k[k.length-1];lastC={time:q[0]/1000,open:+q[1],high:+q[2],low:+q[3],close:+q[4]}}vol.setData(k.map(r=>({time:r[0]/1000,value:+r[5],color:+r[4]>=+r[1]?'rgba(38,166,154,.5)':'rgba(239,83,80,.5)'})));legend();series.setData(k.map(r=>({time:r[0]/1000,open:+r[1],high:+r[2],low:+r[3],close:+r[4]})));
+  loadDR();indDirty=1;
+  {const t1=candles[candles.length-1].t;try{chart.applyOptions({timeScale:{minBarSpacing:0.05}});chart.timeScale().setVisibleRange({from:Math.max(candles[0].t,t1-HD*86400),to:t1})}catch(e){chart.timeScale().scrollToRealTime()}}
+  if(need>k.length&&k.length>=1000)(async()=>{try{
+    const more=await kHist(CM,sym,tf,need-k.length,k[0][0]-1);if(my!==gen||!more.length)return;
+    const vr=chart.timeScale().getVisibleRange(),add=more.map(r=>({t:r[0]/1000,o:+r[1],h:+r[2],l:+r[3],c:+r[4],v:+r[5]})).filter(x=>x.t<candles[0].t);
+    candles=add.concat(candles);
+    series.setData(candles.map(x=>({time:x.t,open:x.o,high:x.h,low:x.l,close:x.c})));
+    vol.setData(candles.map(x=>({time:x.t,value:x.v||0,color:x.c>=x.o?'rgba(38,166,154,.5)':'rgba(239,83,80,.5)'})));
+    indDirty=1;patT=0;
+    const t1=candles[candles.length-1].t;try{chart.timeScale().setVisibleRange({from:Math.max(candles[0].t,t1-HD*86400),to:t1})}catch(e){}
+  }catch(e){}})();
   let buf=[];lastDepth=0;startPoll(sym,my);startStats(sym,my);
   let got=false;const fut=CM==='fut';
   sock=new WebSocket(fut?`${FWS}/market/stream?streams=${s}@kline_${tf}`:`${HOSTS[hi][1]}/stream?streams=${s}@kline_${tf}/${s}@depth@100ms`);
   if(fut)sock2=new WebSocket(`${FWS}/public/stream?streams=${s}@depth@100ms`);
   const onm=e=>{
     got=true;const m=JSON.parse(e.data);
-    if(m.stream.includes('@kline')){const q=m.data.k,cd={time:q.t/1000,open:+q.o,high:+q.h,low:+q.l,close:+q.c};lastC=cd;{const L=candles[candles.length-1];if(L&&L.t===cd.time){L.h=cd.high;L.l=cd.low;L.c=cd.close}else candles.push({t:cd.time,h:cd.high,l:cd.low,c:cd.close})}series.update(cd);vol.update({time:q.t/1000,value:+q.v,color:+q.c>=+q.o?'rgba(38,166,154,.5)':'rgba(239,83,80,.5)'});legend()}
+    if(m.stream.includes('@kline')){const q=m.data.k,cd={time:q.t/1000,open:+q.o,high:+q.h,low:+q.l,close:+q.c};lastC=cd;{const L=candles[candles.length-1];if(L&&L.t===cd.time){L.h=cd.high;L.l=cd.low;L.c=cd.close;L.v=+q.v}else candles.push({t:cd.time,o:cd.open,h:cd.high,l:cd.low,c:cd.close,v:+q.v})}series.update(cd);indDirty=1;vol.update({time:q.t/1000,value:+q.v,color:+q.c>=+q.o?'rgba(38,166,154,.5)':'rgba(239,83,80,.5)'});legend()}
     else{lastDepth=Date.now();if(!synced)buf.push(m.data);else applyDepth(m.data)}
   };
   sock.onmessage=onm;if(sock2)sock2.onmessage=onm;
@@ -836,6 +899,144 @@ function calcWalls(now){
   list=l;
 }
 const fmt=n=>'$'+(n>=1e6?(n/1e6).toFixed(2)+'M':n>=1e3?(n/1e3).toFixed(0)+'K':n.toFixed(0));
+/* ---------- авто-фигуры теханализа ---------- */
+let PATS=[],patT=0,PSRC=null,PC=null,pcT=0,pcKey='';
+const patTf=()=>{const t=S.ptf||'4h';return t==='chart'?S.tf:t};
+/* свечи для поиска фигур на старшем таймфрейме (обновляются раз в минуту) */
+async function loadPC(){const tf=patTf();if(tf===S.tf){PC=null;return}const key=CM+cur+tf;if(key===pcKey&&Date.now()-pcT<60000)return;pcKey=key;pcT=Date.now();try{const k=await apiK(CM,cur,tf,500);if(key===pcKey)PC=k.map(r=>({t:r[0]/1000,h:+r[2],l:+r[3],c:+r[4]}))}catch(e){pcT=Date.now()-45000}}
+function atrN(c,n){let s=0,k=0;for(let i=Math.max(1,c.length-n);i<c.length;i++){s+=Math.max(c[i].h-c[i].l,Math.abs(c[i].h-c[i-1].c),Math.abs(c[i].l-c[i-1].c));k++}return k?s/k:0}
+function pivots(c,k,from){const H=[],L=[];for(let i=Math.max(k,from);i<c.length-k;i++){let ih=1,il=1;for(let j=i-k;j<=i+k;j++){if(j===i)continue;if(c[j].h>c[i].h)ih=0;if(c[j].l<c[i].l)il=0}if(ih)H.push({i,p:c[i].h});if(il)L.push({i,p:c[i].l})}return {H,L}}
+/* линия через две точки-разворота: внутри не должно быть заметных пробоев; выбираем ту, что касается цены чаще */
+function fitLine(c,P,res,atr,n){
+  let best=null;const tol=atr*.35,pp=P.slice(-6);
+  for(let a=0;a<pp.length;a++)for(let b=a+1;b<pp.length;b++){
+    const A=pp[a],B=pp[b];if(B.i-A.i<5||n-1-B.i>60)continue;
+    const m=(B.p-A.p)/(B.i-A.i),v=i=>A.p+m*(i-A.i);let ok=true;
+    for(let i=A.i;i<=B.i;i++){if(res?c[i].h>v(i)+tol:c[i].l<v(i)-tol){ok=false;break}}
+    if(!ok)continue;
+    for(let i=B.i+1;i<n-3;i++){if(res?c[i].c>v(i)+tol:c[i].c<v(i)-tol){ok=false;break}}  // линия уже была пробита раньше — не актуальна
+    if(!ok)continue;
+    let t=0;P.forEach(q=>{if(q.i>=A.i&&Math.abs(q.p-v(q.i))<=tol)t++});
+    const sc=t*10+B.i/n+(B.i-A.i)/n;
+    if(!best||sc>best.sc)best={i1:A.i,p1:A.p,m,t,sc,v};
+  }
+  return best;
+}
+function findPats(cc){
+  const c=cc,n=c.length,out=[];if(n<40)return out;
+  const atr=atrN(c,100)||1e-9,last=c[n-1].c,{H,L}=pivots(c,3,n-160);
+  const brk=(val,up)=>up?last>val+.15*atr:last<val-.15*atr;
+  const res=fitLine(c,H,true,atr,n),sup=fitLine(c,L,false,atr,n);
+  /* треугольники и клинья */
+  let tri=null;
+  if(S.ptr&&res&&sup){
+    const s0=Math.max(res.i1,sup.i1),w0=res.v(s0)-sup.v(s0),w1=res.v(n-1)-sup.v(n-1),fl=.04*atr,mr=res.m,ms=sup.m;
+    if(w0>0&&w1>0&&w1<w0*.8&&n-1-s0>=10){
+      let nm=null,dir='';
+      if(mr<-fl&&ms>fl){nm='Симметричный треугольник';dir='возможен пробой в любую сторону'}
+      else if(Math.abs(mr)<=fl&&ms>fl){nm='Восходящий треугольник';dir='чаще пробой вверх'}
+      else if(mr<-fl&&Math.abs(ms)<=fl){nm='Нисходящий треугольник';dir='чаще пробой вниз'}
+      else if(mr>fl&&ms>fl){nm='Восходящий клин';dir='чаще пробой вниз'}
+      else if(mr<-fl&&ms<-fl){nm='Нисходящий клин';dir='чаще пробой вверх'}
+      if(nm){
+        const up=brk(res.v(n-1),true),dn=brk(sup.v(n-1),false);
+        tri={k:'tri',short:nm,col:'186,104,255',lines:[[res.i1,res.p1,n-1,res.v(n-1)],[sup.i1,sup.p1,n-1,sup.v(n-1)]],
+          lab:{i:n-1,p:(res.v(n-1)+sup.v(n-1))/2,t:'△ '+nm+' — '+(up?'ПРОБОЙ ВВЕРХ':dn?'ПРОБОЙ ВНИЗ':dir)}};
+        out.push(tri);
+      }
+    }
+  }
+  /* линии тренда */
+  if(S.ptl&&!tri){
+    if(res&&res.t>=3)out.push({k:'tl',short:'Сопротивление',col:'239,83,80',dash:1,lines:[[res.i1,res.p1,n-1,res.v(n-1)]],lab:{i:n-1,p:res.v(n-1),t:'Линия сопротивления ('+res.t+(res.t>=5?' касаний)':' касания)')+(brk(res.v(n-1),true)?' — ПРОБОЙ ВВЕРХ':'')}});
+    if(sup&&sup.t>=3)out.push({k:'tl',short:'Поддержка',col:'38,166,154',dash:1,lines:[[sup.i1,sup.p1,n-1,sup.v(n-1)]],lab:{i:n-1,p:sup.v(n-1),t:'Линия поддержки ('+sup.t+(sup.t>=5?' касаний)':' касания)')+(brk(sup.v(n-1),false)?' — ПРОБОЙ ВНИЗ':'')}});
+  }
+  /* флаги ищем раньше накопления, чтобы не дублировать одну и ту же зону */
+  let flg=null;
+  if(S.pfl){
+    for(let Ln=5;Ln<=20&&!flg;Ln++){const j1=n-1-Ln;
+      for(let P=3;P<=12;P++){const j0=j1-P;if(j0<1)break;const mv=c[j1].c-c[j0].c;if(Math.abs(mv)<4*atr||Math.abs(mv)/P<atr)continue;
+        const bull=mv>0;let hi=-Infinity,lo=Infinity;for(let i=j1+1;i<n;i++){hi=Math.max(hi,c[i].h);lo=Math.min(lo,c[i].l)}
+        const retr=bull?(c[j1].c-lo)/mv:(hi-c[j1].c)/-mv;
+        if(retr<.5&&hi-lo<.6*Math.abs(mv)&&(bull?hi<=c[j1].h+.5*atr:lo>=c[j1].l-.5*atr)){flg={j0,j1,bull,hi,lo};break}}}
+  }
+  /* накопление (боковик) */
+  if(S.pac){
+    for(let w=80;w>=15;w-=5){
+      const s=n-1-w;if(s<w)continue;let hi=-Infinity,lo=Infinity,ph=-Infinity,pl=Infinity;
+      for(let i=s;i<n-1;i++){hi=Math.max(hi,c[i].h);lo=Math.min(lo,c[i].l)}
+      for(let i=s-w;i<s;i++){ph=Math.max(ph,c[i].h);pl=Math.min(pl,c[i].l)}
+      if(flg&&s>=flg.j0)break;
+      if(hi-lo<=4.5*atr&&ph-pl>=1.8*(hi-lo)){
+        const up=last>hi+.1*atr,dn=last<lo-.1*atr;
+        out.push({k:'acc',short:'Накопление',col:'255,213,79',box:[s,n-1,lo,hi],lab:{i:s,p:hi,t:'▭ Накопление '+w+' свечей — '+(up?'ПРОБОЙ ВВЕРХ':dn?'ПРОБОЙ ВНИЗ':'возможен пробой')}});
+        break;
+      }
+    }
+  }
+  /* флаги */
+  {const f=flg;
+    if(f){const up=last>f.hi+.1*atr&&f.bull,dn=last<f.lo-.1*atr&&!f.bull;
+      out.push({k:'flag',short:f.bull?'Бычий флаг':'Медвежий флаг',col:f.bull?'38,166,154':'239,83,80',lines:[[f.j0,c[f.j0].c,f.j1,c[f.j1].c]],box:[f.j1,n-1,f.lo,f.hi],
+        lab:{i:f.j1,p:f.bull?f.hi:f.lo,t:'⚑ '+(f.bull?'Бычий флаг — возможен пробой вверх':'Медвежий флаг — возможен пробой вниз')+(up||dn?' (ПРОБОЙ)':'')}})}
+  }
+  /* чаша с ручкой */
+  if(S.pcu){
+    for(const W of [150,110,80,50]){
+      const s=n-1-W;if(s<1)continue;
+      let Li=s;for(let i=s;i<=s+W*.3;i++)if(c[i].h>c[Li].h)Li=i;
+      let Bi=Li;for(let i=Li;i<n;i++)if(c[i].l<c[Bi].l)Bi=i;
+      let Ri=Bi;for(let i=Bi;i<n;i++)if(c[i].h>c[Ri].h)Ri=i;
+      const Lp=c[Li].h,Bp=c[Bi].l,Rp=c[Ri].h,d=Lp-Bp;
+      if(d<3*atr||Bi-Li<W*.2||Ri-Bi<W*.2||Math.abs(Rp-Lp)>.15*d)continue;
+      let mid=0,k=0;const a=Li+Math.round((Ri-Li)/3),b=Li+Math.round(2*(Ri-Li)/3);for(let i=a;i<=b;i++){mid+=c[i].l;k++}
+      if(mid/k>Bp+.45*d)continue;   // форма «V», а не чаша
+      let hl=Infinity;for(let i=Ri+1;i<n;i++)hl=Math.min(hl,c[i].l);
+      const hn=n-1-Ri,pb=hl===Infinity?0:(Rp-hl)/d;
+      if(hn>W*.3||pb>.5)continue;
+      const rim=Math.max(Lp,Rp),up=last>rim+.1*atr;
+      out.push({k:'cup',short:'Чаша с ручкой',col:'0,188,212',cup:[Li,Lp,Bi,Bp,Ri,Rp],lines:[[Li,rim,n-1,rim]],dash:1,
+        lab:{i:Ri,p:rim,t:'◡ Чаша'+(hn>=2&&pb>.05?' с ручкой':'')+' — '+(up?'ПРОБОЙ ВВЕРХ':'возможен пробой вверх')}});
+      break;
+    }
+  }
+  /* двойная вершина / дно */
+  if(S.pdb){
+    const dbl=(P,top)=>{if(P.length<2)return;const A=P[P.length-2],B=P[P.length-1];if(B.i-A.i<8||n-1-B.i>30||Math.abs(A.p-B.p)>.5*atr)return;
+      let nk=top?Infinity:-Infinity;for(let i=A.i;i<=B.i;i++)nk=top?Math.min(nk,c[i].l):Math.max(nk,c[i].h);
+      if(Math.abs(A.p-nk)<2*atr)return;const br=top?last<nk-.1*atr:last>nk+.1*atr;
+      out.push({k:'dbl',short:top?'Двойная вершина':'Двойное дно',col:top?'239,83,80':'38,166,154',pts:[A,B],lines:[[A.i,nk,n-1,nk]],dash:1,
+        lab:{i:B.i,p:B.p,t:(top?'⋀⋀ Двойная вершина — ':'⋁⋁ Двойное дно — ')+(br?'ПРОБОЙ ШЕИ':'при пробое линии шеи '+(top?'вниз':'вверх'))}})};
+    dbl(H,true);dbl(L,false);
+  }
+  return out;
+}
+function drawPats(w,h,right){
+  const ts=chart.timeScale(),Y=p=>series.priceToCoordinate(p),A=candles,an=A.length,PS=PSRC,N=PS.length,ptS=N>1?PS[1].t-PS[0].t:60;
+  if(!an||!N)return;
+  /* время → координата на текущем графике (фигура может быть найдена на другом таймфрейме) */
+  const tX=t=>{if(!an)return null;if(t<=A[0].t)return ts.logicalToCoordinate((t-A[0].t)/((A[1]?A[1].t:A[0].t+60)-A[0].t));
+    if(t>=A[an-1].t)return ts.logicalToCoordinate(an-1+(t-A[an-1].t)/(A[an-1].t-(an>1?A[an-2].t:A[an-1].t-60)||60));
+    let lo=0,hi=an-1;while(hi-lo>1){const m=(lo+hi)>>1;A[m].t<=t?lo=m:hi=m}return ts.logicalToCoordinate(lo+(t-A[lo].t)/(A[hi].t-A[lo].t))};
+  const fiEnd=N-1+Math.max(0,(A[an-1].t-PS[N-1].t)/ptS),T=fi=>fi<=N-1?PS[Math.round(fi)].t:PS[N-1].t+(fi-(N-1))*ptS,X=i=>tX(T(i===N-1?fiEnd:i));
+  const tfl=patTf()===S.tf?'':'['+TFL[patTf()]+'] ';
+  ox.save();ox.font='600 11px system-ui';ox.textBaseline='middle';
+  PATS.forEach(P=>{
+    const col=P.col;ox.strokeStyle=`rgba(${col},.95)`;ox.lineWidth=2;ox.setLineDash(P.dash?[7,5]:[]);
+    (P.lines||[]).forEach(([i1,p1,i2,p2])=>{if(i2===N-1&&i2>i1){p2=p1+(p2-p1)/(i2-i1)*(fiEnd-i1)}const x1=X(i1),x2=X(i2),y1=Y(p1),y2=Y(p2);if(x1==null||x2==null||y1==null||y2==null)return;ox.beginPath();ox.moveTo(x1,y1);ox.lineTo(Math.min(x2,right),y2);ox.stroke()});
+    ox.setLineDash([]);
+    if(P.box){const [i1,i2,lo,hi]=P.box,x1=X(i1),x2=X(i2),y1=Y(hi),y2=Y(lo);if(x1!=null&&x2!=null&&y1!=null&&y2!=null){ox.fillStyle=`rgba(${col},.10)`;ox.fillRect(x1,y1,Math.min(x2,right)-x1,y2-y1);ox.strokeStyle=`rgba(${col},.8)`;ox.lineWidth=1.2;ox.strokeRect(x1,y1,Math.min(x2,right)-x1,y2-y1)}}
+    if(P.cup){const [a,ap,b,bp,r,rp]=P.cup,xa=X(a),xb=X(b),xr=X(r),ya=Y(ap),yb=Y(bp),yr=Y(rp);if([xa,xb,xr,ya,yb,yr].every(v=>v!=null)){ox.strokeStyle=`rgba(${col},.95)`;ox.lineWidth=2.5;ox.beginPath();ox.moveTo(xa,ya);ox.bezierCurveTo(xa+(xb-xa)*.35,yb+(yb-ya)*.25,xb-(xb-xa)*.3,yb,xb,yb);ox.bezierCurveTo(xb+(xr-xb)*.3,yb,xr-(xr-xb)*.35,yb+(yb-yr)*.25,xr,yr);ox.stroke()}}
+    if(P.pts)P.pts.forEach(q=>{const x=X(q.i),y=Y(q.p);if(x==null||y==null)return;ox.fillStyle=`rgba(${col},1)`;ox.beginPath();ox.arc(x,y,4,0,6.2832);ox.fill()});
+    const L=P.lab;if(L){const x=X(L.i),y=Y(L.p),ic=L.t.split(' ')[0];if(x!=null&&y!=null&&ic.length<=2){ox.fillStyle=`rgb(${col})`;ox.textAlign='center';ox.font='700 13px system-ui';ox.fillText(ic,Math.min(x,right-8),Math.max(10,y-12));ox.font='600 11px system-ui'}}
+  });
+  /* список найденных фигур — внизу слева, чтобы подписи не налезали друг на друга */
+  const nOsc=IS.filter(o=>IDEF[o.d.k]&&IDEF[o.d.k].osc).length;let yy=h*(nOsc?(.9-.14*nOsc):.8)-14;ox.textAlign='left';
+  PATS.slice().reverse().forEach(P=>{if(!P.lab)return;const t=tfl+P.lab.t,tw=ox.measureText(t).width+22;if(yy<20)return;
+    ox.fillStyle='rgba(15,19,27,.88)';ox.fillRect(6,yy-9,tw,18);ox.strokeStyle=`rgba(${P.col},1)`;ox.lineWidth=1;ox.strokeRect(6,yy-9,tw,18);
+    ox.fillStyle=`rgb(${P.col})`;ox.fillRect(11,yy-4,8,8);ox.fillText(t,24,yy);yy-=21});
+  ox.restore();
+}
 function draw(){requestAnimationFrame(draw);try{draw0()}catch(e){dbg('ошибка: '+e.message)}}
 function draw0(){
   if(!cur||!chart||!series)return;
@@ -845,7 +1046,7 @@ function draw0(){
   const now=performance.now();
   if(synced&&now-lastCalc>120){lastCalc=now;calcWalls(now);if(S.view==='tv'||S.lad)renderSide(now)}
   fading=fading.filter(f=>now-f.t<1400);
-  if(now-dbgT>500){dbgT=now;dbg('стакан '+bids.size+'/'+asks.size+' · линий '+list.length);renderStat()}
+  if(now-dbgT>500){dbgT=now;dbg('стакан '+bids.size+'/'+asks.size+' · линий '+list.length+(S.pt&&PATS.length?' · фигуры: '+PATS.map(p=>p.short).join(', '):''));renderStat()}
   let pw=60;try{pw=chart.priceScale('right').width()||60}catch(e){}
   const right=w-pw,maxU=Math.max(1,...list.map(x=>x.usd)),maxLen=right*.45;
   const coin=cur.replace('USDT',''),fq=n=>n>=1e6?(n/1e6).toFixed(2)+'M':n>=1e3?(n/1e3).toFixed(1)+'K':n>=1?n.toFixed(2):n.toPrecision(3);
@@ -861,6 +1062,8 @@ function draw0(){
     const txt=(wl.side==='b'?'Покупка ':'Продажа ')+fmt(wl.usd)+' · '+fq(wl.q)+' '+coin+(S.am!=='top'&&!(S.minUsd>0)&&wl.x?' · ×'+wl.x.toFixed(wl.x<10?1:0):'');
     labs.push({y,txt,col,alpha,usd:wl.usd});
   };
+  if(indDirty&&now-indT>800){indT=now;indDirty=0;try{updInd()}catch(e){}}
+  if(S.pt){if(now-patT>1500){patT=now;loadPC();const src=patTf()===S.tf?candles:PC;try{PATS=src?findPats(src):[];PSRC=src}catch(e){PATS=[]}}if(PSRC)drawPats(w,h,right)}
   if(S.prof&&prof.length){
     let pt=series.coordinateToPrice(0),pb=series.coordinateToPrice(h);
     if(pt!=null&&pb!=null){if(pt<pb){const x=pt;pt=pb;pb=x}
@@ -890,13 +1093,190 @@ function draw0(){
       ox.fillStyle=`rgba(${col},${.95*a})`;ox.fillRect(8,y-10,tw,20);ox.strokeStyle=`rgba(255,255,255,${a})`;ox.lineWidth=1;ox.strokeRect(8,y-10,tw,20);ox.fillStyle=`rgba(255,255,255,${a})`;ox.textAlign='left';ox.textBaseline='middle';ox.fillText(t,14,y);
     }else HL=null;
   }
+  drawD(w,h,right);
 }
+/* ---------- инструменты рисования (как в TradingView) ---------- */
+const TOOLS=[['cur','↖','Курсор'],['tl','╱','Линия тренда'],['ray','↗','Луч'],['hl','―','Горизонтальная линия'],['vl','│','Вертикальная линия'],['ch','▱','Параллельный канал'],['rect','▭','Прямоугольник'],['tri','△','Треугольник'],['fib','Fib','Фибоначчи'],['txt','T','Текст'],['ruler','📏','Линейка']];
+const NPT={tl:2,ray:2,hl:1,vl:1,ch:3,rect:2,tri:3,fib:2,txt:1,ruler:2};
+const DCOL=['#2962ff','#ffd54f','#26a69a','#ef5350','#ab47bc','#ff9800','#ffffff'];
+const FIBL=[0,.236,.382,.5,.618,.786,1,1.618];
+let DR=[],tool='cur',pend=[],hov=null,selD=-1,drag=null,dcol='#2962ff',dwid=2,ruler=null,pdown=null;
+const drKey=()=>'cbDr:'+CM+':'+cur;
+function loadDR(){try{DR=JSON.parse(localStorage.getItem(drKey())||'[]')}catch(e){DR=[]}selD=-1;pend=[];hov=null;ruler=null;renderDBar()}
+function saveDR(){try{localStorage.setItem(drKey(),JSON.stringify(DR))}catch(e){}}
+function barSec(){const a=candles,n=a.length;return n>1?a[n-1].t-a[n-2].t:60}
+function t2x(t){const A=candles,an=A.length;if(!an||!chart)return null;const ts=chart.timeScale(),d=barSec();
+  if(t<=A[0].t)return ts.logicalToCoordinate((t-A[0].t)/d);if(t>=A[an-1].t)return ts.logicalToCoordinate(an-1+(t-A[an-1].t)/d);
+  let lo=0,hi=an-1;while(hi-lo>1){const m=(lo+hi)>>1;A[m].t<=t?lo=m:hi=m}return ts.logicalToCoordinate(lo+(t-A[lo].t)/(A[hi].t-A[lo].t))}
+function x2t(x){const A=candles,an=A.length;if(!an||!chart)return null;const l=chart.timeScale().coordinateToLogical(x);if(l==null)return null;const d=barSec();
+  if(l<=0)return A[0].t+l*d;if(l>=an-1)return A[an-1].t+(l-an+1)*d;const i=Math.floor(l);return A[i].t+(l-i)*(A[i+1].t-A[i].t)}
+function evPt(e){const r=$('#main').getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;return {x,y,t:x2t(x),v:series?series.coordinateToPrice(y):null}}
+const scr=q=>({x:t2x(q.t),y:series.priceToCoordinate(q.v)});
+function segD(px,py,a,b){const dx=b.x-a.x,dy=b.y-a.y,l=dx*dx+dy*dy;let t=l?((px-a.x)*dx+(py-a.y)*dy)/l:0;t=Math.max(0,Math.min(1,t));return Math.hypot(px-a.x-t*dx,py-a.y-t*dy)}
+/* отрезки фигуры в экранных координатах — нужны и для рисования, и для выбора пальцем */
+function dSegs(d,P,w){
+  const s=[];if(P.some(p=>p.x==null||p.y==null))return s;const [a,b,c]=P;
+  switch(d.k){
+    case 'tl':s.push([a,b]);break;
+    case 'ray':{const k=(b.x-a.x)||1e-9,ex=b.x>=a.x?w:0;s.push([a,{x:ex,y:a.y+(b.y-a.y)*(ex-a.x)/k}]);break}
+    case 'hl':s.push([{x:0,y:a.y},{x:w,y:a.y}]);break;
+    case 'vl':s.push([{x:a.x,y:0},{x:a.x,y:9999}]);break;
+    case 'rect':s.push([a,{x:b.x,y:a.y}],[{x:b.x,y:a.y},b],[b,{x:a.x,y:b.y}],[{x:a.x,y:b.y},a]);break;
+    case 'tri':if(c)s.push([a,b],[b,c],[c,a]);else s.push([a,b]);break;
+    case 'ch':{s.push([a,b]);if(c){const o=c.y-(a.y+(b.y-a.y)*((c.x-a.x)/((b.x-a.x)||1e-9)));s.push([{x:a.x,y:a.y+o},{x:b.x,y:b.y+o}])}break}
+    case 'fib':FIBL.forEach(l=>{const y=b.y+(a.y-b.y)*l;s.push([{x:Math.min(a.x,b.x),y},{x:w,y}])});break;
+  }
+  return s;
+}
+function hitD(x,y){
+  const w=$('#main').clientWidth;
+  for(let i=DR.length-1;i>=0;i--){const d=DR[i],P=d.p.map(scr);
+    for(let j=0;j<P.length;j++)if(P[j].x!=null&&P[j].y!=null&&Math.hypot(P[j].x-x,P[j].y-y)<14)return {i,hp:j};
+    if(d.k==='txt'&&P[0].x!=null&&x>=P[0].x-4&&x<=P[0].x+8*(d.txt||'').length+8&&Math.abs(y-P[0].y)<14)return {i,hp:-1};
+    if(dSegs(d,P,w).some(([a,b])=>segD(x,y,a,b)<9))return {i,hp:-1};
+  }
+  return null;
+}
+function finishD(){
+  const d={k:tool,p:pend.slice(0,NPT[tool]),c:dcol,w:dwid};
+  if(tool==='txt')d.txt=(($('#dtxt')||{}).value||'Текст').slice(0,80);
+  DR.push(d);pend=[];hov=null;selD=DR.length-1;saveDR();tool='cur';renderDBar();
+}
+{const M=$('#main');
+  M.addEventListener('pointerdown',e=>{
+    if(!chart||!series||S.view==='tv'||!candles.length)return;const P=evPt(e);if(P.t==null||P.v==null)return;
+    if(tool!=='cur'){e.stopPropagation();e.preventDefault();
+      if(tool==='ruler'){ruler={a:P,b:P,live:1};return}
+      pend.push({t:P.t,v:P.v});hov={t:P.t,v:P.v};pdown=P;if(pend.length>=NPT[tool])finishD();return}
+    const h=hitD(P.x,P.y);
+    if(h){e.stopPropagation();e.preventDefault();selD=h.i;drag={i:h.i,hp:h.hp,st:P,orig:JSON.parse(JSON.stringify(DR[h.i].p))};renderDBar()}
+    else if(selD>=0){selD=-1;renderDBar()}
+  },true);
+  M.addEventListener('pointermove',e=>{
+    if(!chart||!series||!candles.length)return;
+    if(tool==='ruler'&&ruler&&ruler.live){ruler.b=evPt(e);e.stopPropagation();return}
+    if(tool!=='cur'&&pend.length){const P=evPt(e);if(P.t!=null&&P.v!=null)hov={t:P.t,v:P.v};e.stopPropagation();e.preventDefault();return}
+    if(drag){e.stopPropagation();e.preventDefault();const P=evPt(e);if(P.t==null||P.v==null)return;const dt=P.t-drag.st.t,dv=P.v-drag.st.v;
+      DR[drag.i].p=drag.orig.map((q,j)=>drag.hp<0||drag.hp===j?{t:q.t+dt,v:q.v+dv}:q)}
+  },true);
+  const up=e=>{
+    if(tool==='ruler'&&ruler&&ruler.live){ruler.live=0;e.stopPropagation();return}
+    if(tool!=='cur'&&pend.length===1&&NPT[tool]>=2&&pdown){const P=evPt(e);if(P.t!=null&&P.v!=null&&Math.hypot(P.x-pdown.x,P.y-pdown.y)>10){pend.push({t:P.t,v:P.v});if(pend.length>=NPT[tool])finishD()}e.stopPropagation();return}
+    if(drag){drag=null;saveDR();e.stopPropagation()}
+  };
+  M.addEventListener('pointerup',up,true);M.addEventListener('pointercancel',up,true);
+}
+function drawD(w,h,right){
+  if(!series||!candles.length)return;
+  const one=(d,sel)=>{
+    const P=d.p.map(scr);if(P.some(p=>p.x==null||p.y==null))return;const [a,b,c]=P;
+    ox.strokeStyle=d.c;ox.fillStyle=d.c;ox.lineWidth=d.w||2;ox.setLineDash([]);
+    if(d.k==='rect'&&b){ox.globalAlpha=.15;ox.fillRect(Math.min(a.x,b.x),Math.min(a.y,b.y),Math.abs(b.x-a.x),Math.abs(b.y-a.y));ox.globalAlpha=1}
+    if(d.k==='tri'&&c){ox.globalAlpha=.15;ox.beginPath();ox.moveTo(a.x,a.y);ox.lineTo(b.x,b.y);ox.lineTo(c.x,c.y);ox.closePath();ox.fill();ox.globalAlpha=1}
+    if(d.k==='ch'&&c){const o=c.y-(a.y+(b.y-a.y)*((c.x-a.x)/((b.x-a.x)||1e-9)));ox.globalAlpha=.12;ox.beginPath();ox.moveTo(a.x,a.y);ox.lineTo(b.x,b.y);ox.lineTo(b.x,b.y+o);ox.lineTo(a.x,a.y+o);ox.closePath();ox.fill();ox.globalAlpha=1}
+    dSegs(d,P,right).forEach(([p,q])=>{ox.beginPath();ox.moveTo(p.x,p.y);ox.lineTo(q.x,Math.min(q.y,h));ox.stroke()});
+    ox.font='600 11px system-ui';ox.textBaseline='middle';ox.textAlign='left';
+    if(d.k==='fib'&&b){FIBL.forEach(l=>{const v=d.p[1].v+(d.p[0].v-d.p[1].v)*l,y=b.y+(a.y-b.y)*l;ox.fillText(l+' ('+v.toFixed(prec)+')',Math.min(a.x,b.x)+4,y-8)})}
+    if(d.k==='hl'){const t=d.p[0].v.toFixed(prec),tw=ox.measureText(t).width+10;ox.fillRect(right-tw,a.y-9,tw,18);ox.fillStyle='#000';ox.fillText(t,right-tw+5,a.y)}
+    if(d.k==='txt'){ox.font='600 14px system-ui';ox.fillText(d.txt||'Текст',a.x,a.y)}
+    if(sel){ox.fillStyle='#fff';ox.strokeStyle=d.c;ox.lineWidth=2;P.forEach(p=>{ox.beginPath();ox.arc(p.x,p.y,5,0,6.2832);ox.fill();ox.stroke()})}
+  };
+  ox.save();
+  DR.forEach((d,i)=>one(d,i===selD));
+  if(tool!=='cur'&&tool!=='ruler'&&pend.length&&hov){const pts=pend.concat([hov]).slice(0,NPT[tool]);one({k:tool,p:pts,c:dcol,w:dwid,txt:''},true)}
+  if(ruler){const a=ruler.a,b=ruler.b;if(a.v!=null&&b.v!=null){const up=b.v>=a.v,col=up?'38,166,154':'239,83,80';
+    ox.fillStyle=`rgba(${col},.18)`;ox.fillRect(Math.min(a.x,b.x),Math.min(a.y,b.y),Math.abs(b.x-a.x),Math.abs(b.y-a.y));
+    const bars=Math.round((b.t-a.t)/barSec()),pc=(b.v/a.v-1)*100,t=(b.v-a.v).toFixed(prec)+' ('+(pc>=0?'+':'')+pc.toFixed(2)+'%) · '+bars+' свеч.',tw=ox.measureText(t).width+12;
+    ox.fillStyle=`rgba(${col},.95)`;ox.fillRect(b.x-tw/2,b.y+(up?-30:10),tw,20);ox.fillStyle='#fff';ox.textAlign='center';ox.textBaseline='middle';ox.fillText(t,b.x,b.y+(up?-20:20))}}
+  ox.restore();
+}
+function renderDBar(){
+  const el=$('#dbar');if(!el)return;
+  el.innerHTML=TOOLS.map(([k,ic,nm])=>'<button class="dt'+(tool===k?' on':'')+'" data-k="'+k+'" title="'+nm+'">'+ic+'<small>'+nm+'</small></button>').join('')
+   +'<span class="dsep"></span>'+DCOL.map(c=>'<button class="dc'+(c===dcol?' on':'')+'" data-c="'+c+'" style="background:'+c+'"></button>').join('')
+   +'<select id="dwid">'+[1,2,3,4].map(n=>'<option'+(n===dwid?' selected':'')+'>'+n+'</option>').join('')+'</select>'
+   +'<input id="dtxt" placeholder="текст для T" value="'+esc(($('#dtxt')||{}).value||'')+'">'
+   +'<button id="ddel"'+(selD<0?' disabled':'')+'>🗑 Удалить</button><button id="dclr">Очистить всё</button>'
+   +(tool!=='cur'?'<span class="dhint">'+(tool==='ruler'?'Протяните пальцем по графику':NPT[tool]===1?'Нажмите на график':NPT[tool]===2?'Проведите пальцем от точки к точке':'Проведите линию, затем нажмите третью точку')+'</span>':'');
+}
+$('#dbar').onclick=e=>{const b=e.target.closest('button');if(!b)return;
+  if(b.dataset.k){tool=b.dataset.k;pend=[];hov=null;if(tool!=='ruler')ruler=null;renderDBar()}
+  else if(b.dataset.c){dcol=b.dataset.c;if(selD>=0){DR[selD].c=dcol;saveDR()}renderDBar()}
+  else if(b.id==='ddel'){if(selD>=0){DR.splice(selD,1);selD=-1;saveDR();renderDBar()}}
+  else if(b.id==='dclr'){if(!DR.length)return;if(b.dataset.ok){DR=[];selD=-1;saveDR();renderDBar()}else{b.dataset.ok=1;b.textContent='Точно? Нажмите ещё раз';setTimeout(()=>{if(b.isConnected){delete b.dataset.ok;b.textContent='Очистить всё'}},3000)}}};
+$('#dbar').onchange=e=>{if(e.target.id==='dwid'){dwid=+e.target.value;if(selD>=0){DR[selD].w=dwid;saveDR()}}};
+$('#dbar').oninput=e=>{if(e.target.id==='dtxt'&&selD>=0&&DR[selD].k==='txt'){DR[selD].txt=e.target.value.slice(0,80);saveDR()}};
+$('#drb').onclick=()=>{const v=$('#dbar').style.display!=='flex';$('#dbar').style.display=v?'flex':'none';$('#drb').classList.toggle('on',v);if(!v){tool='cur';pend=[];ruler=null}renderDBar()};
+
+/* ---------- индикаторы ---------- */
+const IDEF={ma:{n:'MA',p:[20],c:'#ffd54f',l:['Период']},ema:{n:'EMA',p:[50],c:'#2962ff',l:['Период']},wma:{n:'WMA',p:[30],c:'#ff9800',l:['Период']},bb:{n:'Bollinger',p:[20,2],c:'#ab47bc',l:['Период','Откл.']},
+  rsi:{n:'RSI',p:[14],c:'#ffd54f',l:['Период'],osc:1},macd:{n:'MACD',p:[12,26,9],c:'#2962ff',l:['Быстрая','Медленная','Сигнал'],osc:1},stoch:{n:'Stoch',p:[14,3],c:'#26a69a',l:['%K','%D'],osc:1},atr:{n:'ATR',p:[14],c:'#ef5350',l:['Период'],osc:1}};
+let INDS=LS.get('cbInd',[]),IS=[],indDirty=1,indT=0;
+const saveInd=()=>LS.set('cbInd',INDS);
+const smaA=(a,n)=>{const o=new Array(a.length).fill(null);let s=0;for(let i=0;i<a.length;i++){s+=a[i];if(i>=n)s-=a[i-n];if(i>=n-1)o[i]=s/n}return o};
+const emaA=(a,n)=>{const o=new Array(a.length).fill(null),k=2/(n+1);let e=null;for(let i=0;i<a.length;i++){if(a[i]==null)continue;e=e==null?a[i]:a[i]*k+e*(1-k);o[i]=e}return o};
+const wmaA=(a,n)=>{const o=new Array(a.length).fill(null),d=n*(n+1)/2;for(let i=n-1;i<a.length;i++){let s=0;for(let j=0;j<n;j++)s+=a[i-j]*(n-j);o[i]=s/d}return o};
+function calcInd(d){
+  const C=candles.map(x=>x.c),H=candles.map(x=>x.h),L=candles.map(x=>x.l),n=C.length,[p1,p2,p3]=d.p;
+  switch(d.k){
+    case 'ma':return [smaA(C,p1)];case 'ema':return [emaA(C,p1)];case 'wma':return [wmaA(C,p1)];
+    case 'bb':{const m=smaA(C,p1),u=[],l=[];for(let i=0;i<n;i++){if(m[i]==null){u.push(null);l.push(null);continue}let s=0;for(let j=i-p1+1;j<=i;j++)s+=(C[j]-m[i])**2;const sd=Math.sqrt(s/p1);u.push(m[i]+p2*sd);l.push(m[i]-p2*sd)}return [m,u,l]}
+    case 'rsi':{const o=new Array(n).fill(null);let g=0,ls=0;for(let i=1;i<n;i++){const ch=C[i]-C[i-1],G=Math.max(ch,0),Ls=Math.max(-ch,0);if(i<=p1){g+=G/p1;ls+=Ls/p1;if(i===p1)o[i]=ls?100-100/(1+g/ls):100}else{g=(g*(p1-1)+G)/p1;ls=(ls*(p1-1)+Ls)/p1;o[i]=ls?100-100/(1+g/ls):100}}return [o]}
+    case 'macd':{const f=emaA(C,p1),s=emaA(C,p2),m=C.map((x,i)=>f[i]-s[i]),sg=emaA(m,p3);return [m,sg,m.map((x,i)=>x-sg[i])]}
+    case 'stoch':{const k=new Array(n).fill(null);for(let i=p1-1;i<n;i++){let hh=-Infinity,ll=Infinity;for(let j=i-p1+1;j<=i;j++){hh=Math.max(hh,H[j]);ll=Math.min(ll,L[j])}k[i]=hh>ll?(C[i]-ll)/(hh-ll)*100:50}return [k,smaA(k.map(x=>x==null?0:x),p2).map((x,i)=>k[i]==null||i<p1+p2-2?null:x)]}
+    case 'atr':{const tr=C.map((x,i)=>i?Math.max(H[i]-L[i],Math.abs(H[i]-C[i-1]),Math.abs(L[i]-C[i-1])):H[i]-L[i]);return [emaA(tr,p1)]}
+  }
+  return [];
+}
+function rebuildInd(){
+  if(!chart)return;IS.forEach(o=>o.s.forEach(x=>{try{chart.removeSeries(x)}catch(e){}}));IS=[];
+  const osc=INDS.filter(d=>IDEF[d.k]&&IDEF[d.k].osc),no=osc.length;let oi=0;
+  INDS.forEach(d=>{const D=IDEF[d.k];if(!D)return;const o={d,s:[]},sid=D.osc?'osc'+(oi++):'right',opt={lineWidth:2,priceLineVisible:false,lastValueVisible:!!D.osc,priceScaleId:sid,crosshairMarkerVisible:false};
+    if(d.k==='bb'){o.s.push(chart.addLineSeries({...opt,color:d.c}),chart.addLineSeries({...opt,color:d.c,lineWidth:1}),chart.addLineSeries({...opt,color:d.c,lineWidth:1}))}
+    else if(d.k==='macd'){o.s.push(chart.addLineSeries({...opt,color:d.c}),chart.addLineSeries({...opt,color:'#ff9800',lineWidth:1}),chart.addHistogramSeries({priceScaleId:sid,priceLineVisible:false,lastValueVisible:false}))}
+    else if(d.k==='stoch'){o.s.push(chart.addLineSeries({...opt,color:d.c}),chart.addLineSeries({...opt,color:'#ff9800',lineWidth:1}))}
+    else o.s.push(chart.addLineSeries({...opt,color:d.c}));
+    if(d.k==='rsi'||d.k==='stoch'){const lo=d.k==='rsi'?30:20,hi=d.k==='rsi'?70:80;[lo,hi].forEach(v=>o.s[0].createPriceLine({price:v,color:'rgba(140,150,170,.5)',lineWidth:1,lineStyle:2,axisLabelVisible:false}))}
+    if(D.osc){const j=oi-1,top=.9-.14*(no-j);chart.priceScale(sid).applyOptions({scaleMargins:{top,bottom:1-(top+.12)}})}
+    IS.push(o)});
+  chart.priceScale('right').applyOptions({scaleMargins:{top:.06,bottom:no?1-(.9-.14*no)+.02:.22}});
+  chart.priceScale('vol').applyOptions({scaleMargins:{top:no?.9:.82,bottom:0}});
+  indDirty=1;
+}
+function updInd(){
+  if(!chart||!candles.length)return;const T=candles.map(x=>x.t);
+  IS.forEach(o=>{const r=calcInd(o.d);o.last=[];r.forEach((arr,j)=>{const s=o.s[j];if(!s)return;const isH=o.d.k==='macd'&&j===2;
+    s.setData(arr.map((v,i)=>v==null||!isFinite(v)?{time:T[i]}:isH?{time:T[i],value:v,color:v>=0?'rgba(38,166,154,.6)':'rgba(239,83,80,.6)'}:{time:T[i],value:v}));o.last.push(arr[arr.length-1])})});
+  legend();
+}
+function indLeg(p){
+  if(!IS.length)return '';
+  return '<br>'+IS.map(o=>{const D=IDEF[o.d.k];let v=o.last&&o.last[0];if(p&&p.seriesData){const x=p.seriesData.get(o.s[0]);if(x&&x.value!=null)v=x.value}
+    return '<i style="color:'+o.d.c+';font-style:normal">'+D.n+' '+o.d.p.join(' ')+(v!=null&&isFinite(v)?' '+(+v).toFixed(D.osc?2:prec):'')+'</i>'}).join(' &nbsp;');
+}
+function renderIPanel(){
+  const el=$('#ipanel');
+  el.innerHTML='<div class="ih"><b>Индикаторы</b><span></span><button id="ix">✕</button></div>'
+    +(INDS.length?INDS.map((d,i)=>{const D=IDEF[d.k];return '<div class="ir"><b style="color:'+d.c+'">'+D.n+'</b>'+D.l.map((l,j)=>'<label>'+l+' <input type="number" step="any" data-i="'+i+'" data-j="'+j+'" value="'+d.p[j]+'"></label>').join('')
+      +'<span class="sw">'+DCOL.map(c=>'<button class="dc'+(c===d.c?' on':'')+'" data-i="'+i+'" data-c="'+c+'" style="background:'+c+'"></button>').join('')+'</span><button class="idel" data-i="'+i+'">✕</button></div>'}).join(''):'<div class="ie">Индикаторов пока нет — добавьте ниже</div>')
+    +'<div class="ia">'+Object.keys(IDEF).map(k=>'<button data-add="'+k+'">+ '+IDEF[k].n+'</button>').join('')+'</div>';
+}
+$('#ipanel').onclick=e=>{const b=e.target.closest('button');if(!b)return;
+  if(b.id==='ix'){$('#ipanel').style.display='none';$('#indb').classList.remove('on');return}
+  if(b.dataset.add){const D=IDEF[b.dataset.add];INDS.push({k:b.dataset.add,p:D.p.slice(),c:D.c})}
+  else if(b.classList.contains('idel'))INDS.splice(+b.dataset.i,1);
+  else if(b.dataset.c&&b.dataset.i!=null)INDS[+b.dataset.i].c=b.dataset.c;else return;
+  saveInd();rebuildInd();renderIPanel()};
+$('#ipanel').onchange=e=>{const t=e.target;if(t.dataset.i==null||t.dataset.j==null)return;const d=INDS[+t.dataset.i],v=+t.value;if(!(v>0))return;d.p[+t.dataset.j]=d.k==='bb'&&+t.dataset.j===1?v:Math.max(1,Math.min(500,Math.round(v)));saveInd();rebuildInd()};
+$('#indb').onclick=()=>{const p=$('#ipanel'),v=p.style.display!=='block';p.style.display=v?'block':'none';$('#indb').classList.toggle('on',v);if(v)renderIPanel()};
+/* пока рисуем или тащим фигуру — график не должен сдвигаться */
+['mousedown','mousemove','touchstart','touchmove'].forEach(ev=>$('#main').addEventListener(ev,e=>{if(tool!=='cur'||drag){e.stopPropagation();if(ev==='touchmove')e.preventDefault()}},{capture:true,passive:false}));
 
 function showTV(){
   $('#tvw').innerHTML='';
   if(typeof TradingView==='undefined'){$('#tvw').textContent='TradingView не загрузился. Проверь интернет.';return}
-  new TradingView.widget({autosize:true,symbol:'BINANCE:'+cur+(CM==='fut'?'.P':''),interval:{'1m':'1','5m':'5','15m':'15','1h':'60','4h':'240','1d':'D'}[S.tf],
-    timezone:'Etc/UTC',theme:'dark',style:'1',locale:'ru',toolbar_bg:'#0b0e14',enable_publishing:false,allow_symbol_change:true,container_id:'tvw'});
+  new TradingView.widget({autosize:true,symbol:'BINANCE:'+cur+(CM==='fut'?'.P':''),interval:{'1m':'1','5m':'5','15m':'15','1h':'60','4h':'240','1d':'D','1w':'W'}[S.tf],
+    timezone:'Etc/UTC',theme:'dark',style:'1',locale:'ru',toolbar_bg:'#0b0e14',enable_publishing:false,allow_symbol_change:true,hide_side_toolbar:false,withdateranges:true,details:true,container_id:'tvw'});
 }
 function setView(v){
   S.view=v;save();const tv=v==='tv';
@@ -951,6 +1331,7 @@ function loadS(sym){
 function syncUI(){
   $('#pn').textContent='Настройки: '+cur.replace('USDT','/USDT');
   $('#amode').value=S.am||'auto';$('#asens').value=String(S.as||5);$('#minUsd').value=S.minUsd||'';$('#bucket').value=S.bucket;$('#range').value=S.range;
+  $('#hist').value=S.hist||'month';$('#ptf').value=S.ptf||'4h';['pt','ptl','ptr','pfl','pac','pcu','pdb'].forEach(k=>{$('#'+k).checked=S[k]!==false});$('#patb').classList.toggle('on',S.pt!==false);
   $('#sb').checked=S.bids;$('#sa').checked=S.asks;$('#topn').value=S.top;$('#sprof').checked=S.prof;$('#sfit').checked=S.fit;$('#slad').checked=S.lad;$('#stb').checked=S.tbl;$('#tper').value=S.tper;$('#tnat').checked=S.tnat;$('#tnl').value=S.tnl;$('#tsz').value=S.tsz;markTf();
 }
 /* ---------- UI ---------- */
@@ -962,13 +1343,15 @@ st.addEventListener('pointermove',e=>{if(!drag)return;const m=$('#main').getBoun
 st.addEventListener('pointerup',()=>{if(drag){drag=null;save()}});}
 $('#tpos').onclick=()=>{S.tpos=null;save();renderStat()};
 $('#rst').onclick=()=>{S=Object.assign({},DEF,{view:S.view});save();syncUI();applySide();lastCalc=0;list=[];seen.clear();fading=[];if(chart)load();if(S.view==='tv')showTV()};
+$('#patb').onclick=()=>{S.pt=!(S.pt!==false);save();syncUI();patT=0};
 $('#ladb').onclick=()=>{S.lad=!S.lad;save();syncUI();applySide();lastSide=0;lastCalc=0};
+$('#pclose').onclick=()=>{$('#panel').style.display='none'};
 $('#gear').onclick=()=>{const p=$('#panel');p.style.display=p.style.display==='flex'?'none':'flex'};
 markTf();$('#minUsd').value=S.minUsd||'';$('#bucket').value=S.bucket;$('#range').value=S.range;
 $('#sb').checked=S.bids;$('#sa').checked=S.asks;
 $('#tfs').onclick=e=>{const b=e.target.closest('button');if(!b)return;S.tf=b.dataset.tf;save();markTf();if(chart)load();if(S.view==='tv')showTV()};
-const upd=()=>{S.am=$('#amode').value;S.as=+$('#asens').value;S.minUsd=+$('#minUsd').value||0;S.bucket=+$('#bucket').value;S.range=+$('#range').value;S.bids=$('#sb').checked;S.asks=$('#sa').checked;S.top=Math.max(1,Math.min(50,+$('#topn').value||8));S.prof=$('#sprof').checked;S.fit=$('#sfit').checked;S.lad=$('#slad').checked;applySide();try{chart&&chart.priceScale('right').applyOptions({autoScale:true})}catch(e){}S.tbl=$('#stb').checked;S.tper=$('#tper').value;S.tnat=$('#tnat').checked;S.tnl=Math.max(2,Math.min(100,+$('#tnl').value||14));S.tsz=+$('#tsz').value;save();if(cur)startStats(cur,gen);lastCalc=0;list=[];seen.clear();fading=[]};
-['amode','asens','minUsd','bucket','range','sb','sa','topn','sprof','sfit','slad','stb','tper','tnat','tnl','tsz'].forEach(i=>$('#'+i).onchange=upd);
+const upd=()=>{const oh=S.hist;S.hist=$('#hist').value;S.ptf=$('#ptf').value;pcKey='';if(oh!==S.hist&&cur)setTimeout(load,0);['pt','ptl','ptr','pfl','pac','pcu','pdb'].forEach(k=>{S[k]=$('#'+k).checked});$('#patb').classList.toggle('on',S.pt);patT=0;S.am=$('#amode').value;S.as=+$('#asens').value;S.minUsd=+$('#minUsd').value||0;S.bucket=+$('#bucket').value;S.range=+$('#range').value;S.bids=$('#sb').checked;S.asks=$('#sa').checked;S.top=Math.max(1,Math.min(50,+$('#topn').value||8));S.prof=$('#sprof').checked;S.fit=$('#sfit').checked;S.lad=$('#slad').checked;applySide();try{chart&&chart.priceScale('right').applyOptions({autoScale:true})}catch(e){}S.tbl=$('#stb').checked;S.tper=$('#tper').value;S.tnat=$('#tnat').checked;S.tnl=Math.max(2,Math.min(100,+$('#tnl').value||14));S.tsz=+$('#tsz').value;save();if(cur)startStats(cur,gen);lastCalc=0;list=[];seen.clear();fading=[]};
+['hist','ptf','pt','ptl','ptr','pfl','pac','pcu','pdb','amode','asens','minUsd','bucket','range','sb','sa','topn','sprof','sfit','slad','stb','tper','tnat','tnl','tsz'].forEach(i=>$('#'+i).onchange=upd);
 initBubbles().catch(()=>{$('#hint').textContent='Не удалось подключиться к Binance. Проверь интернет/VPN.'});
 tickBubbles();draw();
 </script></body></html>
