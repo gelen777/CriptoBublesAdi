@@ -45,7 +45,7 @@ class MainActivity : Activity() {
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
         web.evaluateJavascript(
-            "(function(){var c=document.getElementById('cv');if(c.style.display==='flex'){document.getElementById('back').click();return 1}return 0})()"
+            "(function(){return window.cbBack?window.cbBack():0})()"
         ) { r -> if (r != "1") finish() }
     }
 
