@@ -360,7 +360,7 @@ const saveKN=()=>{knDirty=0;LS.set('cbK',{spot:[...KN.spot],fut:[...KN.fut]});LS
 setInterval(()=>{if(knDirty)saveKN()},20000);document.addEventListener('visibilitychange',()=>{if(document.hidden&&knDirty)saveKN()});
 const isNew=c=>c.nw&&Date.now()-c.nw<NEWMS;
 function toast(msg,sym){const t=$('#toast');t.textContent=msg;t.dataset.s=sym||'';t.style.display='block';clearTimeout(toastT);toastT=setTimeout(()=>{t.style.display='none'},8000)}
-$('#toast').onclick=e=>{const t=e.currentTarget,s=t.dataset.s;t.style.display='none';if(s&&coins.has(s))openCoin(s)};
+$('#toast').onclick=e=>{const t=e.currentTarget,s=t.dataset.s;t.style.display='none';if(s==='__upd'){if(window.Android)Android.reload();return}if(s&&coins.has(s))openCoin(s)};
 function addNew(s,mk,ts){
   NWL[mk][s]=ts;saveKN();
   if(mk!==AS.mkt){pendNew.delete(s);return}
@@ -815,10 +815,14 @@ function applyBL(){const el=$('#blist');el.classList.toggle('off',!blOpen);el.cl
 $('#blopen').onclick=()=>{blOpen=true;applyBL()};
 setInterval(()=>{if($('#bub').style.display!=='none'&&document.activeElement!==$('#blq'))renderBL()},1500);
 applyBL();
+/* обновление приложения прямо внутри (без переустановки): новая версия скачивается с GitHub */
+let updReady=false;
+window.cbUpd=st=>{if(st===1){updReady=true;toast('⬆ Вышло обновление приложения — нажмите сюда, чтобы применить','__upd')}else if(st===0)toast('✅ У вас последняя версия');else toast('Не удалось проверить обновление — нет интернета');const e=$('#updst');if(e)e.textContent=st===1?'Обновление скачано — нажмите «Применить»':st===0?'Установлена последняя версия':'Нет связи с сервером обновлений';const b=$('#updgo');if(b)b.style.display=updReady?'':'none'};
 function renderSet(){
   $('#spanel').innerHTML='<div class="ccH"><button id="sx">←</button><b>Настройки</b></div><div class="pad">'
    +'<div class="row"><span>Цвета</span><select id="scol">'+Object.keys(SCH).map(k=>'<option value="'+k+'"'+(AS.colors===k?' selected':'')+'>'+SCH[k].n+'</option>').join('')+'</select></div>'
    +'<div class="row"><span>Тема</span><span><button class="chip'+(AS.theme===1?' on':'')+'" data-th="1">1</button> <button class="chip'+(AS.theme===2?' on':'')+'" data-th="2">2</button></span></div>'
+   +'<div class="h3">Обновление приложения</div><div class="row"><span id="updst">'+(window.Android?(updReady?'Обновление скачано — нажмите «Применить»':'Приложение само проверяет обновления при запуске'):'Доступно в приложении на телефоне')+'</span><span><button id="updchk">🔄 Проверить</button> <button id="updgo" style="'+(updReady?'':'display:none')+'">⬆ Применить</button></span></div>'
    +'<div class="h3">Монеты Binance</div><div class="row"><span>Загрузить свежий список монет спота и фьючерсов — новые сразу появятся в пузырях</span><button id="rfc">🔄 Обновить монеты</button></div><div class="row"><small id="rfst" style="color:#8b93a7">'+(LS.get('cbRf',0)?'Последнее обновление: '+new Date(LS.get('cbRf',0)).toLocaleString('ru-RU'):'Ещё не обновлялось')+' · всего монет сейчас: '+coins.size+'. Чтобы видеть все, выберите «Монет: Все» в настройках пузырей (✎).</small></div>'
    +'<div class="h3">Новости</div><div class="row"><span>Подсветка монет (КУПИТЬ / ПРОДАТЬ)</span><span><button class="chip'+(AS.news!==0?' on':'')+'" data-nw="1">Вкл</button> <button class="chip'+(AS.news===0?' on':'')+'" data-nw="0">Выкл</button></span></div>'
    +'<div class="row"><span>Всплывающие срочные новости</span><span><button class="chip'+(AS.ntoast!==0?' on':'')+'" data-nt="1">Вкл</button> <button class="chip'+(AS.ntoast===0?' on':'')+'" data-nt="0">Выкл</button></span></div>'
@@ -835,6 +839,8 @@ $('#spanel').onclick=e=>{
   if(b.id==='sx')$('#spanel').style.display='none';
   else if(b.dataset.th){AS.theme=+b.dataset.th;applyCfg(true);renderSet()}
   else if(b.id==='rfc'){refreshCoins(b)}
+  else if(b.id==='updchk'){if(window.Android){$('#updst').textContent='Проверяю…';Android.check()}else toast('Проверка обновлений работает в приложении на телефоне')}
+  else if(b.id==='updgo'){if(window.Android)Android.reload()}
   else if(b.dataset.nw){AS.news=+b.dataset.nw;saveAll();renderSet()}
   else if(b.dataset.nt){AS.ntoast=+b.dataset.nt;saveAll();renderSet()}
   else if(b.classList.contains('wd')){if(LISTS.watch.length>1){LISTS.watch=LISTS.watch.filter(w=>w.id!==b.dataset.w);if(AS.sort==='w:'+b.dataset.w)AS.sort='all';applyCfg(true);renderSet()}}
