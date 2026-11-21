@@ -11,11 +11,11 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
-      - name: Accept Android SDK licenses
-        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+      - uses: android-actions/setup-android@v3
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: 8.7
+      - run: base64 -d app/debug-keystore.b64 > app/debug.keystore
       - run: gradle assembleDebug --no-daemon
       - uses: actions/upload-artifact@v4
         with:
