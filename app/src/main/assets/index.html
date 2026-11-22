@@ -4,7 +4,12 @@
 <title>Крипто-пузыри</title>
 <script>
 (function(){var u=['https://cdnjs.cloudflare.com/ajax/libs/lightweight-charts/4.1.3/lightweight-charts.standalone.production.js','https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js','https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js'];
-window.lwcReady=new Promise(function(res){var i=0;(function n(){if(window.LightweightCharts||i>=u.length)return res(!!window.LightweightCharts);var t=document.createElement('script');t.src=u[i++];t.onload=function(){res(!!window.LightweightCharts)};t.onerror=n;document.head.appendChild(t)})()})})();
+function inl(code){try{var t=document.createElement('script');t.textContent=code;document.head.appendChild(t)}catch(e){}return !!window.LightweightCharts}
+var LK='lwc413',c0=null;try{c0=localStorage.getItem(LK)}catch(e){}
+if(c0&&inl(c0)){window.lwcReady=Promise.resolve(true);return}
+window.lwcReady=new Promise(function(res){var i=0;(function n(){if(window.LightweightCharts)return res(true);if(i>=u.length)return res(false);var url=u[i++],ac=new AbortController(),tm=setTimeout(function(){ac.abort()},8000);
+fetch(url,{signal:ac.signal}).then(function(r){if(!r.ok)throw 0;return r.text()}).then(function(code){clearTimeout(tm);if(code.length>50000&&inl(code)){try{localStorage.setItem(LK,code)}catch(e){}res(true)}else n()}).catch(function(){clearTimeout(tm);
+var t=document.createElement('script');t.src=url;t.onload=function(){window.LightweightCharts?res(true):n()};t.onerror=n;document.head.appendChild(t)})})()})})();
 </script>
 <script src="https://s3.tradingview.com/tv.js"></script>
 <style>
@@ -172,8 +177,6 @@ body.th2,body.th2 #bub,body.th2 .ov{--bg:#000;background:#000}
       <label>История <select id="hist"><option value="week">Неделя</option><option value="month">Месяц</option><option value="year">Год</option></select></label>
     </div>
     <div class="sec"><h4>🐋 Линии китов на графике</h4>
-      <label>Режим <select id="amode"><option value="auto">Авто: где крупные деньги</option><option value="top">Топ по объёму</option></select></label>
-      <label>Чувствительность <select id="asens"><option value="3">высокая (×3)</option><option value="5">средняя (×5)</option><option value="8">только огромные (×8)</option></select></label>
       <label>Линий на сторону <input id="topn" type="number" min="1" max="50" style="width:60px"></label>
       <label>Мин. сумма $ <input id="minUsd" type="number" min="0" step="10000" placeholder="не задано"></label>
       <label><input id="sb" type="checkbox"> Покупки</label><label><input id="sa" type="checkbox"> Продажи</label>
@@ -204,7 +207,7 @@ body.th2,body.th2 #bub,body.th2 .ov{--bg:#000;background:#000}
 <script>
 const $=s=>document.querySelector(s);
 const HOSTS=[['https://api.binance.com','wss://stream.binance.com:9443'],['https://data-api.binance.vision','wss://data-stream.binance.vision'],['https://api-gcp.binance.com','wss://stream.binance.com:443']];
-let hi=0,useWs=false,useWsF=false;
+let hi=0,useWs=false,useWsF=false;const KC=new Map();
 const FWS='wss://fstream.binance.com',HF=['https://fapi.binance.com','https://fapi1.binance.com','https://fapi2.binance.com'];
 const bn=n=>n.replace(/^(1000000|10000|1000)(?=[A-Z])/,'');
 /* REST может блокироваться (CORS/сеть), тогда те же запросы идут через WebSocket API Binance */
@@ -214,15 +217,15 @@ function mkApi(url){
   const reset=s=>{if(s!==w)return;w=null;q.length=0;try{s.close()}catch(e){}P.forEach(p=>{clearTimeout(p.t);p.no(new Error('ws closed'))});P.clear()};
   const open=()=>{
     if(w&&w.readyState<=1)return w;
-    const s=new WebSocket(url);w=s;
+    const s=new WebSocket(url);w=s;s._l=Date.now();
     s.onopen=()=>{q.splice(0).forEach(m=>s.send(m))};
-    s.onmessage=e=>{const m=JSON.parse(e.data),p=P.get(m.id);if(!p)return;P.delete(m.id);clearTimeout(p.t);m.status===200?p.ok(m.result):p.no(new Error('ws '+m.status))};
+    s.onmessage=e=>{s._l=Date.now();const m=JSON.parse(e.data),p=P.get(m.id);if(!p)return;P.delete(m.id);clearTimeout(p.t);m.status===200?p.ok(m.result):p.no(new Error('ws '+m.status))};
     s.onclose=s.onerror=()=>reset(s);
     return s;
   };
   return (method,params,ms)=>new Promise((ok,no)=>{
     const id=String(++n),msg=JSON.stringify({id,method,params}),s=open();
-    P.set(id,{ok,no,t:setTimeout(()=>{P.delete(id);no(new Error('ws timeout'));reset(s)},ms||12000)});
+    P.set(id,{ok,no,t:setTimeout(()=>{P.delete(id);no(new Error('ws timeout'));if(Date.now()-(s._l||0)>=(ms||12000))reset(s)},ms||12000)});
     s.readyState===1?s.send(msg):q.push(msg);
   });
 }
@@ -274,25 +277,26 @@ async function bj(path){
   }
   try{return await viaWs(path)}catch(e){throw new Error('net')}
 }
+let fRestBad=0;
 async function bjf(path,restOnly){
-  if(!useWsF||restOnly){
-    try{return await Promise.any(HF.map(async h=>{const c=new AbortController(),t=setTimeout(()=>c.abort(),5000);try{const r=await fetch(h+path,{signal:c.signal});if(!r.ok)throw 0;return await r.json()}finally{clearTimeout(t)}}))}
-    catch(e){if(restOnly)throw new Error('net');useWsF=true}
+  if(!useWsF||restOnly||Date.now()-fRestBad>90000){
+    try{const r=await Promise.any(HF.map(async h=>{const c=new AbortController(),t=setTimeout(()=>c.abort(),4000);try{const r=await fetch(h+path,{signal:c.signal});if(!r.ok)throw 0;return await r.json()}finally{clearTimeout(t)}}));useWsF=false;return r}
+    catch(e){fRestBad=Date.now();if(restOnly)throw new Error('net');useWsF=true}
   }
   try{return await viaWsF(path)}catch(e){throw new Error('net')}
 }
 const apiK=(m,sym,iv,lim,end)=>{const e=end?'&endTime='+end:'';return m==='fut'?bjf(`/fapi/v1/klines?symbol=${sym}&interval=${iv}&limit=${lim}${e}`):bj(`/api/v3/klines?symbol=${sym}&interval=${iv}&limit=${lim}${e}`)};
 /* длинная история: несколько запросов по 1000 свечей назад во времени */
-async function kHist(m,sym,tf,bars,end0){let out=[],end=end0||0;while(out.length<bars){const n=Math.min(1000,bars-out.length);let k=null;
-  for(let a=0;a<3&&!k;a++){try{k=await apiK(m,sym,tf,n,end)}catch(e){if(a===2){if(out.length)return out;throw e}await new Promise(r=>setTimeout(r,400))}}
+async function kHist(m,sym,tf,bars,end0,alive){let out=[],end=end0||0;while(out.length<bars){if(alive&&!alive())break;const n=Math.min(1000,bars-out.length);let k=null;
+  for(let a=0;a<3&&!k;a++){try{k=await apiK(m,sym,tf,n,end)}catch(e){if(a===2){if(out.length)return out;throw e}await new Promise(r=>setTimeout(r,250))}}
   if(!k.length)break;out=k.concat(out);if(k.length<n)break;end=k[0][0]-1}return out}
 const apiD=(m,sym,lim)=>m==='fut'?bjf(`/fapi/v1/depth?symbol=${sym}&limit=${Math.min(lim,1000)}`):bj(`/api/v3/depth?symbol=${sym}&limit=${lim}`);
 const STB=new Set(['USDC','FDUSD','TUSD','USDP','EUR','EURI','AEUR','DAI','USDE','XUSD','USD1','RLUSD','U','RWUSD','BFUSD','USDS','PYUSD','USDG','EURC','UST','SUSD','BUSD','USDD','USDJ','FRAX','LUSD','GUSD','CUSD','GBP','AUD','BRL','TRY','RUB','UAH','JPY','CAD','ARS','PLN','RON','CZK','MXN','COP']);
 const STK=new Set('MU MUU TSLA NBIS NFLX NVDA SNDK SOXL SOXS MRVL MSTR SKHY SNXX TQQQ SQQQ AAPL INTC KORU AXTI SPCX CBRS HOOD CRCL LITE MSFT AMD AMZN GOOGL GOOG AAOI COIN PLTR SPY QQQ IWM SKUU META DRAM ORCL DELL COHR CRDO ARM AVGO VST ALAB EWY USAR AMAT BMNR TSM BABA UBER GLD SLV SMCI CRWV RDDT GME AMC MARA RIOT CLSK IREN CIFR WULF CRWD PANW ADBE CRM PYPL SHOP DIS NKE WMT COST JPM BAC GS XOM LLY UNH RIVN NIO ASML QCOM TXN IBM CSCO INTU SNOW ABNB DASH SBET GLXY OKLO SMR RKLB ASTS IONQ RGTI QBTS SOFI HIMS TEM CEG GEV VRT ANET MDB DDOG XAU XAG XPT XPD ANT SKHYNIX SAMSUNG CL BZ NATGAS UVXY SKDD MVLL INTW BE TTWO WDC MSTU NVDL TSLL CONL ZHIPU STRC GLW OPENAI ZHONGJI MINIMAX CXMT MRNA SOXX SMH NOK FLNC DJT AGPU CYPH FWDI PDD SHAZ KSTR SECZ BRK'.split(' '));
 const isStock=c=>/tokeni[sz]ed|xstock|bstocks/i.test(c.nm||'')||(c.n.length>=3&&c.n.endsWith('B')&&STK.has(c.n.slice(0,-1)))||(AS.mkt==='fut'&&(STK.has(c.n)||/^CSOP|\d[LS]$/.test(c.n)))||(c.n.length>=4&&c.n.endsWith('B')&&!c.rk&&c.p>=1&&!/^(BNB|ARB|SHIB|TRB|ORB|KUB|SUB|PNUTB)$/.test(c.n));
 const isStable=c=>STB.has(c.n)||(c.p>.985&&c.p<1.015&&c.h>0&&(c.h-c.l)/c.p<.006);
-const DEF={tper:'24ч,12ч,4ч,1ч',tnat:true,tnl:14,tsz:1,tpos:null,tbl:true,view:'own',tf:'15m',minUsd:0,bucket:0.1,range:5,bids:true,asks:true,top:8,prof:true,fit:false,lad:true,lg:0,am:'auto',as:5,pt:true,ptl:true,ptr:true,pfl:true,pac:true,pcu:true,pdb:true,ptf:'4h',hist:'month'};
-let S={view:'own',tf:'15m',minUsd:0,bucket:0.1,range:5,bids:true,asks:true,top:8,prof:true,fit:false,lad:true,lg:0,am:'auto',as:5,pt:true,ptl:true,ptr:true,pfl:true,pac:true,pcu:true,pdb:true,ptf:'4h',hist:'month'};
+const DEF={tper:'24ч,12ч,4ч,1ч',tnat:true,tnl:14,tsz:1,tpos:null,tbl:true,view:'own',tf:'15m',minUsd:0,bucket:0.1,range:5,bids:true,asks:true,top:8,prof:true,fit:false,lad:true,lg:0,pt:true,ptl:true,ptr:true,pfl:true,pac:true,pcu:true,pdb:true,ptf:'4h',hist:'month'};
+let S={view:'own',tf:'15m',minUsd:0,bucket:0.1,range:5,bids:true,asks:true,top:8,prof:true,fit:false,lad:true,lg:0,pt:true,ptl:true,ptr:true,pfl:true,pac:true,pcu:true,pdb:true,ptf:'4h',hist:'month'};
 try{Object.assign(S,JSON.parse(localStorage.getItem('cbw')||'{}'))}catch(e){}
 const save=()=>{try{const j=JSON.stringify(S);localStorage.setItem('cbw',j);if(cur)localStorage.setItem('cbw:'+cur,j)}catch(e){}};
 
@@ -971,7 +975,8 @@ async function openChart(sym,view){
   $('#ttl').textContent=sym.replace('USDT','/USDT')+(CM==='fut'?' · Фьюч.':'');markTf();
   setView(S.view);
   if(!chart){
-    if(!(await lwcReady)){$('#chart').innerHTML='<div style="padding:20px;color:#ef5350">Не удалось загрузить библиотеку графика. Проверь интернет или VPN, либо нажми TradingView.</div>';return}
+    const ok=await lwcReady;if(cur!==sym)return;if(chart){chart.applyOptions({watermark:{visible:true,fontSize:48,horzAlign:'center',vertAlign:'center',color:'rgba(120,123,134,.12)',text:sym.replace('USDT','/USDT')}});return load()}
+    if(!ok){$('#chart').innerHTML='<div style="padding:20px;color:#ef5350">Не удалось загрузить библиотеку графика. Проверь интернет или VPN, либо нажми TradingView.</div>';return}
     chart=LightweightCharts.createChart($('#chart'),{autoSize:true,
       layout:{background:{color:'#131722'},textColor:'#d1d4dc',fontFamily:'-apple-system,BlinkMacSystemFont,Trebuchet MS,Roboto,sans-serif'},
       grid:{vertLines:{color:'rgba(42,46,57,.6)'},horzLines:{color:'rgba(42,46,57,.6)'}},
@@ -991,11 +996,12 @@ async function openChart(sym,view){
 async function load(){
   closeSock();stats={};bids.clear();asks.clear();list=[];fading=[];seen.clear();synced=false;bookU=0;needSnap=false;PATS=[];patT=0;PC=null;pcKey='';prof=[];bookLo=bookHi=0;sideInit=false;{const sd=$('#side');sd._k=0;sd.innerHTML='<div class="h">Стакан загружается…</div>'}
   const sym=cur,tf=S.tf,my=++gen,s=sym.toLowerCase();
-  let k;
+  let k,fromCache=false;const ck=CM+'|'+sym+'|'+tf;
   const TS={'1m':60,'5m':300,'15m':900,'1h':3600,'4h':14400,'1d':86400,'1w':604800}[tf]||60,HD={week:7,month:30,year:365}[S.hist]||30;
   const need=Math.max(400,Math.min(5000,Math.ceil(HD*86400/TS)+20));
   /* сначала быстро грузим последние 1000 свечей, остальную историю — фоном */
-  try{k=await kHist(CM,sym,tf,Math.min(1000,need));if(!k.length)throw 0}catch(e){
+  {const c=KC.get(ck);if(c&&c.length){k=c;fromCache=true}}
+  if(!k)try{k=await kHist(CM,sym,tf,Math.min(1000,need),0,()=>my===gen);if(!k.length)throw 0}catch(e){
     const pp=(coins.get(sym)||{}).p;
     if(CM!=='fut'||!pp)return setTimeout(()=>my===gen&&load(),2000);
     const sc=TS,t0=Math.floor(Date.now()/1000/sc)*sc*1000;k=[[t0,pp,pp,pp,pp,0]];
@@ -1006,13 +1012,23 @@ async function load(){
   prec=p;candles=k.map(r=>({t:r[0]/1000,o:+r[1],h:+r[2],l:+r[3],c:+r[4],v:+r[5]}));{const q=k[k.length-1];lastC={time:q[0]/1000,open:+q[1],high:+q[2],low:+q[3],close:+q[4]}}vol.setData(k.map(r=>({time:r[0]/1000,value:+r[5],color:+r[4]>=+r[1]?'rgba(38,166,154,.5)':'rgba(239,83,80,.5)'})));legend();series.setData(k.map(r=>({time:r[0]/1000,open:+r[1],high:+r[2],low:+r[3],close:+r[4]})));
   loadDR();indDirty=1;
   {const t1=candles[candles.length-1].t;try{chart.applyOptions({timeScale:{minBarSpacing:0.05}});chart.timeScale().setVisibleRange({from:Math.max(candles[0].t,t1-HD*86400),to:t1})}catch(e){chart.timeScale().scrollToRealTime()}}
-  if(need>k.length&&k.length>=1000)(async()=>{try{
-    const more=await kHist(CM,sym,tf,need-k.length,k[0][0]-1);if(my!==gen||!more.length)return;
+  const keep=()=>{if(my!==gen||candles.length<2)return;KC.delete(ck);KC.set(ck,candles.map(x=>[x.t*1000,x.o,x.h,x.l,x.c,x.v]));while(KC.size>16)KC.delete(KC.keys().next().value)};
+  if(fromCache)(async()=>{try{
+    const fr=await kHist(CM,sym,tf,1000,0,()=>my===gen);if(my!==gen||!fr.length)return;
+    const f0=fr[0][0]/1000,nw=fr.map(r=>({t:r[0]/1000,o:+r[1],h:+r[2],l:+r[3],c:+r[4],v:+r[5]})),tail=candles.filter(x=>x.t>nw[nw.length-1].t);
+    candles=candles.filter(x=>x.t<f0).concat(nw,tail);
+    series.setData(candles.map(x=>({time:x.t,open:x.o,high:x.h,low:x.l,close:x.c})));
+    vol.setData(candles.map(x=>({time:x.t,value:x.v||0,color:x.c>=x.o?'rgba(38,166,154,.5)':'rgba(239,83,80,.5)'})));
+    indDirty=1;patT=0;keep();
+  }catch(e){}})();
+  else keep();
+  if(!fromCache&&need>k.length&&k.length>=1000)(async()=>{try{
+    const more=await kHist(CM,sym,tf,need-k.length,k[0][0]-1,()=>my===gen);if(my!==gen||!more.length)return;
     const vr=chart.timeScale().getVisibleRange(),add=more.map(r=>({t:r[0]/1000,o:+r[1],h:+r[2],l:+r[3],c:+r[4],v:+r[5]})).filter(x=>x.t<candles[0].t);
     candles=add.concat(candles);
     series.setData(candles.map(x=>({time:x.t,open:x.o,high:x.h,low:x.l,close:x.c})));
     vol.setData(candles.map(x=>({time:x.t,value:x.v||0,color:x.c>=x.o?'rgba(38,166,154,.5)':'rgba(239,83,80,.5)'})));
-    indDirty=1;patT=0;
+    indDirty=1;patT=0;keep();
     const t1=candles[candles.length-1].t;try{chart.timeScale().setVisibleRange({from:Math.max(candles[0].t,t1-HD*86400),to:t1})}catch(e){}
   }catch(e){}})();
   let buf=[];lastDepth=0;startPoll(sym,my);startStats(sym,my);
@@ -1021,7 +1037,7 @@ async function load(){
   if(fut)sock2=new WebSocket(`${FWS}/public/stream?streams=${s}@depth@100ms`);
   const onm=e=>{
     got=true;const m=JSON.parse(e.data);
-    if(m.stream.includes('@kline')){const q=m.data.k,cd={time:q.t/1000,open:+q.o,high:+q.h,low:+q.l,close:+q.c};lastC=cd;{const L=candles[candles.length-1];if(L&&L.t===cd.time){L.h=cd.high;L.l=cd.low;L.c=cd.close;L.v=+q.v}else candles.push({t:cd.time,o:cd.open,h:cd.high,l:cd.low,c:cd.close,v:+q.v})}series.update(cd);indDirty=1;vol.update({time:q.t/1000,value:+q.v,color:+q.c>=+q.o?'rgba(38,166,154,.5)':'rgba(239,83,80,.5)'});legend()}
+    if(m.stream.includes('@kline')){const q=m.data.k,cd={time:q.t/1000,open:+q.o,high:+q.h,low:+q.l,close:+q.c};lastC=cd;{const L=candles[candles.length-1];if(L&&L.t===cd.time){L.h=cd.high;L.l=cd.low;L.c=cd.close;L.v=+q.v}else candles.push({t:cd.time,o:cd.open,h:cd.high,l:cd.low,c:cd.close,v:+q.v})}series.update(cd);indLive=1;vol.update({time:q.t/1000,value:+q.v,color:+q.c>=+q.o?'rgba(38,166,154,.5)':'rgba(239,83,80,.5)'});legend()}
     else{lastDepth=Date.now();if(!synced)buf.push(m.data);else applyDepth(m.data)}
   };
   sock.onmessage=onm;if(sock2)sock2.onmessage=onm;
@@ -1139,15 +1155,6 @@ function calcWalls(now){
   let l=[...m.values()];
   prof=l.slice();bookLo=Infinity;bookHi=0;prof.forEach(w=>{if(w.p<bookLo)bookLo=w.p;if(w.p>bookHi)bookHi=w.p});if(bookLo===Infinity)bookLo=0;
   if(S.minUsd>0)l=l.filter(w=>w.usd>=S.minUsd);
-  else if(S.am!=='top'){
-    /* авто: уровень считается «китом», если денег на нём во много раз больше, чем на обычном уровне (медиана) этой стороны стакана */
-    const N=S.top||8,out=[];
-    ['b','a'].forEach(sd=>{const v=l.filter(w=>w.side===sd);if(v.length<5)return;
-      const u=v.map(w=>w.usd).sort((x,y)=>x-y),med=u[u.length>>1]||1;
-      v.forEach(w=>{w.x=w.usd/med});
-      v.filter(w=>w.x>=(S.as||5)).sort((x,y)=>y.usd-x.usd).slice(0,N).forEach(w=>out.push(w))});
-    l=out;
-  }
   else{l.sort((x,y)=>y.usd-x.usd);const nb=[],na=[],N=S.top||8;l.forEach(w=>{const t=w.side==='b'?nb:na;t.length<N&&t.push(w)});l=nb.concat(na)}
   const cs=new Set(l.map(w=>w.key));
   list.forEach(w=>{if(!cs.has(w.key)){fading.push({...w,t:now});seen.delete(w.key)}});
@@ -1159,7 +1166,7 @@ const fmt=n=>'$'+(n>=1e6?(n/1e6).toFixed(2)+'M':n>=1e3?(n/1e3).toFixed(0)+'K':n.
 let PATS=[],patT=0,PSRC=null,PC=null,pcT=0,pcKey='';
 const patTf=()=>{const t=S.ptf||'4h';return t==='chart'?S.tf:t};
 /* свечи для поиска фигур на старшем таймфрейме (обновляются раз в минуту) */
-async function loadPC(){const tf=patTf();if(tf===S.tf){PC=null;return}const key=CM+cur+tf;if(key===pcKey&&Date.now()-pcT<60000)return;pcKey=key;pcT=Date.now();try{const k=await apiK(CM,cur,tf,500);if(key===pcKey)PC=k.map(r=>({t:r[0]/1000,h:+r[2],l:+r[3],c:+r[4]}))}catch(e){pcT=Date.now()-45000}}
+let pcBusy=false;async function loadPC(){const tf=patTf();if(tf===S.tf){PC=null;return}if(pcBusy||!candles.length||!synced&&Date.now()-pcT<3000)return;const key=CM+cur+tf;if(key===pcKey&&Date.now()-pcT<60000)return;pcKey=key;pcT=Date.now();pcBusy=true;try{const k=await apiK(CM,cur,tf,500);if(key===pcKey)PC=k.map(r=>({t:r[0]/1000,h:+r[2],l:+r[3],c:+r[4]}))}catch(e){pcT=Date.now()-45000}finally{pcBusy=false}}
 function atrN(c,n){let s=0,k=0;for(let i=Math.max(1,c.length-n);i<c.length;i++){s+=Math.max(c[i].h-c[i].l,Math.abs(c[i].h-c[i-1].c),Math.abs(c[i].l-c[i-1].c));k++}return k?s/k:0}
 function pivots(c,k,from){const H=[],L=[];for(let i=Math.max(k,from);i<c.length-k;i++){let ih=1,il=1;for(let j=i-k;j<=i+k;j++){if(j===i)continue;if(c[j].h>c[i].h)ih=0;if(c[j].l<c[i].l)il=0}if(ih)H.push({i,p:c[i].h});if(il)L.push({i,p:c[i].l})}return {H,L}}
 /* линия через две точки-разворота: внутри не должно быть заметных пробоев; выбираем ту, что касается цены чаще */
@@ -1315,11 +1322,12 @@ function draw0(){
     ox.beginPath();ox.moveTo(0,y);ox.lineTo(right,y);ox.stroke();
     ox.fillStyle=`rgba(${col},${.5*alpha})`;ox.fillRect(right-len,y-hh/2,len,hh);
     if(pulse){ox.strokeStyle=`rgba(255,255,255,${pulse})`;ox.lineWidth=1.5;ox.strokeRect(right-len,y-hh/2,len,hh)}
-    const txt=(wl.side==='b'?'Покупка ':'Продажа ')+fmt(wl.usd)+' · '+fq(wl.q)+' '+coin+(S.am!=='top'&&!(S.minUsd>0)&&wl.x?' · ×'+wl.x.toFixed(wl.x<10?1:0):'');
+    const txt=(wl.side==='b'?'Покупка ':'Продажа ')+fmt(wl.usd)+' · '+fq(wl.q)+' '+coin;
     labs.push({y,txt,col,alpha,usd:wl.usd});
   };
-  if(indDirty&&now-indT>800){indT=now;indDirty=0;try{updInd()}catch(e){}}
-  if(S.pt){if(now-patT>1500){patT=now;loadPC();const src=patTf()===S.tf?candles:PC;try{PATS=src?findPats(src):[];PSRC=src}catch(e){PATS=[]}}if(PSRC)drawPats(w,h,right)}
+  if(indDirty&&now-indT>800){indT=now;indDirty=0;indLive=0;try{updInd()}catch(e){}}
+  else if(indLive&&now-indT>1000){indT=now;indLive=0;try{updIndLast()}catch(e){indDirty=1}}
+  if(S.pt){if(now-patT>3000){patT=now;loadPC();const src=patTf()===S.tf?candles:PC;try{PATS=src?findPats(src):[];PSRC=src}catch(e){PATS=[]}}if(PSRC)drawPats(w,h,right)}
   if(S.prof&&prof.length){
     let pt=series.coordinateToPrice(0),pb=series.coordinateToPrice(h);
     if(pt!=null&&pb!=null){if(pt<pb){const x=pt;pt=pb;pb=x}
@@ -1528,6 +1536,12 @@ function rebuildInd(){
   chart.priceScale('vol').applyOptions({scaleMargins:{top:no?.9:.82,bottom:0}});
   indDirty=1;
 }
+let indLive=0;
+function updIndLast(){
+  if(!chart||candles.length<2||!IS.length)return;const n=candles.length,t=candles[n-1].t;
+  IS.forEach(o=>{const r=calcInd(o.d);o.last=[];r.forEach((arr,j)=>{const s=o.s[j];if(!s)return;const v=arr[n-1],isH=o.d.k==='macd'&&j===2;o.last.push(v);
+    if(v==null||!isFinite(v))return;s.update(isH?{time:t,value:v,color:v>=0?'rgba(38,166,154,.6)':'rgba(239,83,80,.6)'}:{time:t,value:v})})});
+}
 function updInd(){
   if(!chart||!candles.length)return;const T=candles.map(x=>x.t);
   IS.forEach(o=>{const r=calcInd(o.d);o.last=[];r.forEach((arr,j)=>{const s=o.s[j];if(!s)return;const isH=o.d.k==='macd'&&j===2;
@@ -1615,7 +1629,7 @@ function loadS(sym){
 }
 function syncUI(){
   $('#pn').textContent='Настройки: '+cur.replace('USDT','/USDT');
-  $('#amode').value=S.am||'auto';$('#asens').value=String(S.as||5);$('#minUsd').value=S.minUsd||'';$('#bucket').value=S.bucket;$('#range').value=S.range;
+  $('#minUsd').value=S.minUsd||'';$('#bucket').value=S.bucket;$('#range').value=S.range;
   $('#hist').value=S.hist||'month';$('#ptf').value=S.ptf||'4h';['pt','ptl','ptr','pfl','pac','pcu','pdb'].forEach(k=>{$('#'+k).checked=S[k]!==false});$('#patb').classList.toggle('on',S.pt!==false);
   $('#sb').checked=S.bids;$('#sa').checked=S.asks;$('#topn').value=S.top;$('#sprof').checked=S.prof;$('#sfit').checked=S.fit;$('#slad').checked=S.lad;$('#stb').checked=S.tbl;$('#tper').value=S.tper;$('#tnat').checked=S.tnat;$('#tnl').value=S.tnl;$('#tsz').value=S.tsz;markTf();
 }
@@ -1635,8 +1649,8 @@ $('#gear').onclick=()=>{const p=$('#panel');p.style.display=p.style.display==='f
 markTf();$('#minUsd').value=S.minUsd||'';$('#bucket').value=S.bucket;$('#range').value=S.range;
 $('#sb').checked=S.bids;$('#sa').checked=S.asks;
 $('#tfs').onclick=e=>{const b=e.target.closest('button');if(!b)return;S.tf=b.dataset.tf;save();markTf();if(chart)load();if(S.view==='tv')showTV()};
-const upd=()=>{const oh=S.hist;S.hist=$('#hist').value;S.ptf=$('#ptf').value;pcKey='';if(oh!==S.hist&&cur)setTimeout(load,0);['pt','ptl','ptr','pfl','pac','pcu','pdb'].forEach(k=>{S[k]=$('#'+k).checked});$('#patb').classList.toggle('on',S.pt);patT=0;S.am=$('#amode').value;S.as=+$('#asens').value;S.minUsd=+$('#minUsd').value||0;S.bucket=+$('#bucket').value;S.range=+$('#range').value;S.bids=$('#sb').checked;S.asks=$('#sa').checked;S.top=Math.max(1,Math.min(50,+$('#topn').value||8));S.prof=$('#sprof').checked;S.fit=$('#sfit').checked;S.lad=$('#slad').checked;applySide();try{chart&&chart.priceScale('right').applyOptions({autoScale:true})}catch(e){}S.tbl=$('#stb').checked;S.tper=$('#tper').value;S.tnat=$('#tnat').checked;S.tnl=Math.max(2,Math.min(100,+$('#tnl').value||14));S.tsz=+$('#tsz').value;save();if(cur)startStats(cur,gen);lastCalc=0;list=[];seen.clear();fading=[]};
-['hist','ptf','pt','ptl','ptr','pfl','pac','pcu','pdb','amode','asens','minUsd','bucket','range','sb','sa','topn','sprof','sfit','slad','stb','tper','tnat','tnl','tsz'].forEach(i=>$('#'+i).onchange=upd);
+const upd=()=>{const oh=S.hist;S.hist=$('#hist').value;S.ptf=$('#ptf').value;pcKey='';if(oh!==S.hist&&cur)setTimeout(load,0);['pt','ptl','ptr','pfl','pac','pcu','pdb'].forEach(k=>{S[k]=$('#'+k).checked});$('#patb').classList.toggle('on',S.pt);patT=0;S.minUsd=+$('#minUsd').value||0;S.bucket=+$('#bucket').value;S.range=+$('#range').value;S.bids=$('#sb').checked;S.asks=$('#sa').checked;S.top=Math.max(1,Math.min(50,+$('#topn').value||8));S.prof=$('#sprof').checked;S.fit=$('#sfit').checked;S.lad=$('#slad').checked;applySide();try{chart&&chart.priceScale('right').applyOptions({autoScale:true})}catch(e){}S.tbl=$('#stb').checked;S.tper=$('#tper').value;S.tnat=$('#tnat').checked;S.tnl=Math.max(2,Math.min(100,+$('#tnl').value||14));S.tsz=+$('#tsz').value;save();if(cur)startStats(cur,gen);lastCalc=0;list=[];seen.clear();fading=[]};
+['hist','ptf','pt','ptl','ptr','pfl','pac','pcu','pdb','minUsd','bucket','range','sb','sa','topn','sprof','sfit','slad','stb','tper','tnat','tnl','tsz'].forEach(i=>$('#'+i).onchange=upd);
 /* если сеть моргнула при запуске — пробуем снова, пока не загрузится */
 function startBubbles(n){initBubbles().catch(()=>{$('#hint').textContent='Нет связи с Binance, пробую снова… (проверьте интернет/VPN)';setTimeout(()=>{if(!coins.size)startBubbles((n||0)+1)},Math.min(15000,3000*((n||0)+1)))})}
 startBubbles(0);
