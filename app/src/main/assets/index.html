@@ -11,7 +11,6 @@ window.lwcReady=new Promise(function(res){var i=0;(function n(){if(window.Lightw
 fetch(url,{signal:ac.signal}).then(function(r){if(!r.ok)throw 0;return r.text()}).then(function(code){clearTimeout(tm);if(code.length>50000&&inl(code)){try{localStorage.setItem(LK,code)}catch(e){}res(true)}else n()}).catch(function(){clearTimeout(tm);
 var t=document.createElement('script');t.src=url;t.onload=function(){window.LightweightCharts?res(true):n()};t.onerror=n;document.head.appendChild(t)})})()})})();
 </script>
-<script src="https://s3.tradingview.com/tv.js"></script>
 <style>
 *{box-sizing:border-box}
 html,body{height:100%;margin:0;background:#0b0e14;color:#d6dae3;font:14px system-ui,sans-serif;overflow:hidden}
@@ -1013,7 +1012,7 @@ $('#coin').onclick=e=>{
   else if(b.dataset.p){CCp=b.dataset.p;updCoin()}
   else if(b.dataset.l){const k=b.dataset.l,L=k==='fav'?LISTS.fav:k==='block'?LISTS.block:(LISTS.watch.find(w=>w.id===k.slice(2))||{coins:[]}).coins,i=L.indexOf(CC.s);i<0?L.push(CC.s):L.splice(i,1);saveAll();updCoin();VIS=visible()}
   else if(b.id==='cchart'){const s=CC.s;closeCoin();openChart(s,'own')}
-  else if(b.id==='ctv'){const s=CC.s;closeCoin();openChart(s,'tv')}
+  else if(b.id==='ctv'){openTW(CC.s,AS.mkt==='fut',S.tf)}
 };
 $('#coin').oninput=e=>{
   if(!CC)return;const a=parseFloat(String(e.target.value).replace(',','.'));
@@ -1721,8 +1720,12 @@ function syncUI(){
 /* ---------- UI ---------- */
 $('#back').onclick=()=>{gen++;cur=null;closeSock();$('#cv').style.display='none';$('#bub').style.display='flex'};
 /* TW: открыть эту монету в вашем TradingView (приложение или сайт, где вы уже вошли в свой аккаунт) */
-const twUrl=()=>{const iv={'1m':'1','5m':'5','15m':'15','1h':'60','4h':'240','1d':'D','1w':'W'}[S.tf]||'15';return 'https://www.tradingview.com/chart/?symbol='+encodeURIComponent('BINANCE:'+cur+(CM==='fut'?'.P':''))+'&interval='+iv};
-$('#vw').onclick=()=>{if(!cur)return;const u=twUrl();if(window.Android)location.href=u;else window.open(u,'_blank')}
+function twUrl(sym=cur,fut=CM==='fut',tf=S.tf){const iv={'1m':'1','5m':'5','15m':'15','1h':'60','4h':'240','1d':'D','1w':'W'}[tf]||'15';return 'https://www.tradingview.com/chart/?symbol='+encodeURIComponent('BINANCE:'+sym+(fut?'.P':''))+'&interval='+iv}
+function openURL(u){if(window.Android)location.href=u;else window.open(u,'_blank')}
+function openTW(sym,fut,tf){if(sym)openURL(twUrl(sym,fut,tf))}
+$('#vw').onclick=()=>openTW(cur,CM==='fut',S.tf);
+/* все внешние ссылки (новости, TradingView, CoinGecko) открываются в своём приложении или браузере */
+document.addEventListener('click',e=>{const a=e.target.closest&&e.target.closest('a[href^="http"]');if(!a)return;e.preventDefault();openURL(a.href)},true);
 const markFav=()=>{const on=!!cur&&LISTS.fav.includes(cur),b=$('#fstar');b.classList.toggle('on',on);b.textContent=on?'★':'☆'};
 $('#fstar').onclick=()=>{if(!cur)return;const i=LISTS.fav.indexOf(cur);i<0?LISTS.fav.push(cur):LISTS.fav.splice(i,1);saveAll();markFav();toast(i<0?'★ '+cur.replace('USDT','')+' добавлена в избранное':'Убрана из избранного');try{renderBL&&renderBL()}catch(e){}};
 {const st=$('#stat');let drag=null;
