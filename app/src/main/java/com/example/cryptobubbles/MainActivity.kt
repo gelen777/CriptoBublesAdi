@@ -6,11 +6,15 @@ import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
 import android.view.WindowManager
+import android.os.SystemClock
+import android.view.ViewGroup
 import android.webkit.JavascriptInterface
+import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.Toast
 import java.io.File
 import org.json.JSONObject
 import java.net.HttpURLConnection
@@ -18,6 +22,9 @@ import java.net.URL
 
 class MainActivity : Activity() {
     private lateinit var web: WebView
+    private var alive = true          // false после onDestroy — фоновые потоки больше не трогают WebView
+    private var lastBack = 0L         // время прошлого «Назад» на главном экране (выход только двойным нажатием)
+    private var backBusy = false      // защита от двойного срабатывания, пока JS ещё отвечает
     // Живое обновление: свежая версия интерфейса берётся с GitHub, без переустановки APK
     private val updUrl = "https://raw.githubusercontent.com/gelen777/CriptoBublesAdi/main/app/src/main/assets/index.html"
     private val base = "file:///android_asset/index.html"
@@ -32,6 +39,13 @@ class MainActivity : Activity() {
         val inst = try { packageManager.getPackageInfo(packageName, 0).lastUpdateTime } catch (e: Exception) { 0L }
         if (prefs.getLong("inst", -1L) != inst) { cache.delete(); prefs.edit().putLong("inst", inst).apply() }
 
+        createWeb()
+        loadApp()
+        checkUpdate(false)
+    }
+
+    @SuppressLint("SetJavaScriptEnabled", "JavascriptInterface")
+    private fun createWeb() {
         web = WebView(this)
         web.setBackgroundColor(Color.parseColor("#0B0E14"))
         web.settings.apply {
@@ -43,13 +57,21 @@ class MainActivity : Activity() {
         web.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(v: WebView, r: WebResourceRequest): Boolean {
                 if (!r.isForMainFrame || r.url.scheme == "file") return false
-                startActivity(Intent(Intent.ACTION_VIEW, r.url))
+                // нет браузера / приложения TradingView — раньше это роняло приложение
+                try { startActivity(Intent(Intent.ACTION_VIEW, r.url)) }
+                catch (e: Exception) { Toast.makeText(this@MainActivity, "Не удалось открыть ссылку", Toast.LENGTH_SHORT).show() }
+                return true
+            }
+            // движок страницы упал (часто от нехватки памяти) — по умолчанию Android закрывает всё приложение.
+            // Вместо этого пересоздаём WebView и открываем интерфейс заново.
+            override fun onRenderProcessGone(v: WebView, d: RenderProcessGoneDetail?): Boolean {
+                if (!alive) return true
+                try { (v.parent as? ViewGroup)?.removeView(v); v.destroy() } catch (e: Exception) {}
+                createWeb(); loadApp()
                 return true
             }
         }
         setContentView(web)
-        loadApp()
-        checkUpdate(false)
     }
 
     private fun appHtml(): String =
@@ -61,7 +83,7 @@ class MainActivity : Activity() {
         web.loadDataWithBaseURL(base, appHtml(), "text/html", "utf-8", base)
     }
 
-    private fun js(code: String) = runOnUiThread { web.evaluateJavascript(code, null) }
+    private fun js(code: String) = runOnUiThread { if (alive) try { web.evaluateJavascript(code, null) } catch (e: Exception) {} }
 
     private fun checkUpdate(manual: Boolean) {
         Thread {
@@ -83,7 +105,7 @@ class MainActivity : Activity() {
     }
 
     inner class Bridge {
-        @JavascriptInterface fun reload() { runOnUiThread { loadApp() } }
+        @JavascriptInterface fun reload() { runOnUiThread { if (alive) loadApp() } }
         @JavascriptInterface fun check() { checkUpdate(true) }
         /* сетевой запрос из приложения, без ограничений браузера (CORS): нужен для истории фьючерсов */
         @JavascriptInterface fun get(id: Int, url: String, ms: Int) {
@@ -110,10 +132,35 @@ class MainActivity : Activity() {
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
+        if (backBusy) return
+        backBusy = true
+        // интерфейс сам закрывает верхнее окно (настройки, монета, график…) и отвечает "1".
+        // Приложение закрывается ТОЛЬКО если интерфейс ответил "0" (уже главный экран) и «Назад» нажали дважды.
+        // Любой другой ответ (ошибка, страница ещё грузится) больше НЕ закрывает приложение.
         web.evaluateJavascript(
-            "(function(){return window.cbBack?window.cbBack():0})()"
-        ) { r -> if (r != "1") finish() }
+            "(function(){try{return window.cbBack?window.cbBack():0}catch(e){return 2}})()"
+        ) { r ->
+            backBusy = false
+            if (r == "1") return@evaluateJavascript
+            if (r != "0") {
+                // ответ непонятный — на всякий случай просто прячем все всплывающие окна
+                web.evaluateJavascript("(function(){try{window.cbHideAll&&cbHideAll()}catch(e){}})()", null)
+            }
+            val now = SystemClock.elapsedRealtime()
+            if (now - lastBack < 2000) finish()
+            else {
+                lastBack = now
+                Toast.makeText(this, "Нажмите «Назад» ещё раз, чтобы выйти", Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
-    override fun onDestroy() { web.destroy(); super.onDestroy() }
+    override fun onPause() { super.onPause(); if (alive) web.onPause() }
+    override fun onResume() { super.onResume(); if (alive) web.onResume() }
+
+    override fun onDestroy() {
+        alive = false
+        try { web.destroy() } catch (e: Exception) {}
+        super.onDestroy()
+    }
 }

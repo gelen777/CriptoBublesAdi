@@ -430,7 +430,7 @@ function logoOf(c){
 
 /* данные монет */
 const okSym=(y,fut)=>fut?/^[A-Z0-9]+USDT$/.test(y):(y.endsWith('USDT')&&!/(UP|DOWN|BULL|BEAR)USDT$/.test(y));
-function mkCoin(y,p,o,vol,h,l){const c={id:cid++,s:y,n:y.slice(0,-4),p,o,vol,h,l,st:false,nw:NWL[AS.mkt][y]||0,base:0,bp:'',bt:0,ch:0,mc:0,rk:0,x:W/2+(Math.random()-.5)*W*.6,y:H/2+(Math.random()-.5)*H*.6,vx:0,vy:0,r:6};c.st=!c.nw&&isStable(c);attachMk(c);coins.set(y,c)}
+function mkCoin(y,p,o,vol,h,l){const c={id:cid++,s:y,n:y.slice(0,-4),p,o,vol,h,l,st:false,nw:NWL[AS.mkt][y]||0,base:0,bp:'',bt:0,ch:0,mc:0,rk:0,x:W/2+(Math.random()-.5)*W*.6,y:H/2+(Math.random()-.5)*H*.6,vx:0,vy:0,r:6,da:0,db:0,va:0,vb:0,sz:0,vs:0,ph:Math.random()*6.283};c.st=!c.nw&&isStable(c);attachMk(c);coins.set(y,c)}
 /* новые листинги: список известных пар хранится между запусками; пара, которой раньше не было, проверяется по возрасту (меньше 4 дневных свечей) и сразу попадает на экран */
 const NEWMS=3*864e5;
 let KN={spot:new Set(),fut:new Set()},NWL={spot:{},fut:{}},knBase={spot:0,fut:0},pendNew=new Map(),toastT=0,chkP=Promise.resolve(),chkN=0;
@@ -570,6 +570,24 @@ function contentOf(c,cf){
     default:return fsg(c.ch);
   }
 }
+/* «живые» пузыри: упругая деформация (сплющивание при ударе, вытягивание в полёте) и блик как у мыльного шарика */
+function squish(c,nx,ny,amt){if(!(amt>0))return;amt=Math.min(.1,amt);c.va-=amt*(nx*nx-ny*ny);c.vb-=amt*2*nx*ny}
+const BHL=(()=>{const z=128,o=document.createElement('canvas');o.width=o.height=z;const x=o.getContext('2d'),R=z/2;x.translate(R,R);
+  /* мягкий большой блик сверху слева */
+  x.save();x.rotate(-.65);x.scale(1,.52);let g=x.createRadialGradient(-.05*R,-.78*R,0,-.05*R,-.78*R,.5*R);
+  g.addColorStop(0,'rgba(255,255,255,.55)');g.addColorStop(.6,'rgba(255,255,255,.16)');g.addColorStop(1,'rgba(255,255,255,0)');
+  x.fillStyle=g;x.beginPath();x.arc(-.05*R,-.78*R,.5*R,0,6.2832);x.fill();x.restore();
+  /* яркая искорка */
+  g=x.createRadialGradient(-.46*R,-.5*R,0,-.46*R,-.5*R,.1*R);g.addColorStop(0,'rgba(255,255,255,.95)');g.addColorStop(1,'rgba(255,255,255,0)');
+  x.fillStyle=g;x.beginPath();x.arc(-.46*R,-.5*R,.1*R,0,6.2832);x.fill();
+  /* радужная плёнка по краю, как у мыльного пузыря */
+  g=x.createLinearGradient(-R,-R,R,R);['rgba(120,200,255,.0)','rgba(120,200,255,.22)','rgba(200,140,255,.2)','rgba(255,170,200,.16)','rgba(255,230,150,.0)'].forEach((c,i,a)=>g.addColorStop(i/(a.length-1),c));
+  x.strokeStyle=g;x.lineWidth=.07*R;x.lineCap='round';x.beginPath();x.arc(0,0,.9*R,-1.25,.35);x.stroke();
+  /* отражённый свет снизу справа */
+  x.strokeStyle='rgba(255,255,255,.2)';x.lineWidth=.05*R;x.beginPath();x.arc(0,0,.84*R,.55,1.35);x.stroke();
+  /* тонкий внутренний ободок */
+  x.strokeStyle='rgba(255,255,255,.07)';x.lineWidth=.03*R;x.beginPath();x.arc(0,0,.95*R,0,6.2832);x.stroke();
+  return o})();
 const lm=(v,r)=>v>0&&r[1]>r[0]?(Math.log(v)-r[0])/(r[1]-r[0]):0;
 function tickBubbles(){
   requestAnimationFrame(tickBubbles);
@@ -612,20 +630,35 @@ function tickBubbles(){
       for(const q of l){if(q.id<=p.id)continue;if(Math.hypot(q.x-p.x,q.y-p.y)<p.r+q.r+10)pr.push([p,q])}}});
   /* удары пузырей друг о друга: упругий обмен скоростями (тяжёлые большие толкают маленькие) */
   pr.forEach(([p,q])=>{const dx=q.x-p.x,dy=q.y-p.y,d=Math.hypot(dx,dy)||1;if(d>p.r+q.r+1)return;const nx=dx/d,ny=dy/d,vn=(q.vx-p.vx)*nx+(q.vy-p.vy)*ny;if(vn>=0)return;
-    const mp=p===G?1e9:p.r*p.r,mq=q===G?1e9:q.r*q.r,j=-1.8*vn/(1/mp+1/mq);if(p!==G){p.vx-=j/mp*nx;p.vy-=j/mp*ny}if(q!==G){q.vx+=j/mq*nx;q.vy+=j/mq*ny}});
+    const mp=p===G?1e9:p.r*p.r,mq=q===G?1e9:q.r*q.r,j=-1.8*vn/(1/mp+1/mq);squish(p,nx,ny,-vn*.02*Math.min(1,mq/mp));squish(q,nx,ny,-vn*.02*Math.min(1,mp/mq));if(p!==G){p.vx-=j/mp*nx;p.vy-=j/mp*ny}if(q!==G){q.vx+=j/mq*nx;q.vy+=j/mq*ny}});
   for(let it=0;it<6;it++){
     pr.forEach(([p,q])=>{let dx=q.x-p.x,dy=q.y-p.y,d=Math.hypot(dx,dy);if(d<.5){dx=Math.random()-.5;dy=Math.random()-.5;d=Math.hypot(dx,dy)||1}
       const m=p.r+q.r+1;if(d<m){const o=(m-d)/d;let wp=q.r*q.r/(p.r*p.r+q.r*q.r);if(p===G)wp=0;else if(q===G)wp=1;p.x-=dx*o*wp;p.y-=dy*o*wp;q.x+=dx*o*(1-wp);q.y+=dy*o*(1-wp)}});
     a.forEach(c=>{c.x=Math.min(W-c.r,Math.max(c.r,c.x));c.y=Math.min(H-c.r,Math.max(c.r,c.y))});
   }
+  /* упругость: форма и размер возвращаются к шару с лёгким «желе»-колебанием */
+  a.forEach(c=>{if(c.va===undefined){c.da=c.db=c.va=c.vb=c.sz=c.vs=0;c.ph=Math.random()*6.283}
+    const vx=c.vx,vy=c.vy,sp2=vx*vx+vy*vy;let ta=0,tb=0;
+    if(sp2>.09){const T=Math.min(.07,Math.sqrt(sp2)*.006);ta=T*(vx*vx-vy*vy)/sp2;tb=T*2*vx*vy/sp2}
+    c.va=(c.va+(ta-c.da)*.16)*.86;c.vb=(c.vb+(tb-c.db)*.16)*.86;c.da+=c.va;c.db+=c.vb;
+    const m=Math.hypot(c.da,c.db);if(m>.15){c.da*=.15/m;c.db*=.15/m}
+    c.vs=(c.vs+((c===G?.1:0)-c.sz)*.14)*.8;c.sz+=c.vs});
   /* волны от касаний */
   ripples=ripples.filter(w=>now-w.t<700);
   a.forEach(c=>{
-    const r=c.r,col=colOf(c,cf),rgb=col.join(','),st=cf.color==='perf'?Math.min(Math.abs(c.ch)/p95,1):.45;
-    const gr=bx.createRadialGradient(c.x,c.y,r*.3,c.x,c.y,r);
-    gr.addColorStop(0,'rgba('+rgb+',.03)');gr.addColorStop(1,'rgba('+rgb+','+(.16+.55*st)+')');
-    bx.beginPath();bx.arc(c.x,c.y,r,0,6.2832);bx.fillStyle=gr;bx.fill();
-    bx.strokeStyle='rgba('+rgb+','+(.5+.5*st)+')';bx.lineWidth=Math.max(1,r*.05);bx.stroke();
+    const col=colOf(c,cf),rgb=col.join(','),st=cf.color==='perf'?Math.min(Math.abs(c.ch)/p95,1):.45;
+    const r=Math.max(2,c.r*(1+c.sz)*(1+.018*Math.sin(now/1100+c.ph)));
+    const dm=Math.hypot(c.da,c.db),dk=1+dm,dth=Math.atan2(c.db,c.da)/2;
+    bx.save();bx.translate(c.x,c.y);if(dm>.004){bx.rotate(dth);bx.scale(dk,1/dk);bx.rotate(-dth)}
+    /* почти прозрачная серединка, цвет собирается к краю — как у стеклянного шарика */
+    const gr=bx.createRadialGradient(-r*.22,-r*.28,0,0,0,r);
+    gr.addColorStop(0,'rgba('+rgb+',0)');gr.addColorStop(.55,'rgba('+rgb+','+(.04+.07*st)+')');
+    gr.addColorStop(.86,'rgba('+rgb+','+(.12+.26*st)+')');gr.addColorStop(1,'rgba('+rgb+','+(.3+.4*st)+')');
+    bx.beginPath();bx.arc(0,0,r,0,6.2832);bx.fillStyle=gr;bx.fill();
+    bx.strokeStyle='rgba('+rgb+','+(.45+.45*st)+')';bx.lineWidth=Math.max(1,r*.032);bx.stroke();
+    if(c===G){bx.strokeStyle='rgba('+rgb+',.28)';bx.lineWidth=Math.max(2,r*.09);bx.beginPath();bx.arc(0,0,r*1.07,0,6.2832);bx.stroke()}
+    if(r>=6)bx.drawImage(BHL,-r,-r,r*2,r*2);
+    bx.restore();
     if(isNew(c)){bx.fillStyle='#ffd54f';
       if(r<16){bx.beginPath();bx.arc(c.x+r*.72,c.y-r*.72,3.5,0,6.2832);bx.fill()}
       else{const fz=Math.max(8,Math.min(10,r*.3)),w=fz*2.7,py=c.y-r-fz*.55;bx.beginPath();bx.roundRect?bx.roundRect(c.x-w/2,py,w,fz+4,4):bx.rect(c.x-w/2,py,w,fz+4);bx.fill();bx.font='800 '+fz+'px system-ui';bx.fillStyle='#000';bx.textAlign='center';bx.textBaseline='middle';bx.fillText('NEW',c.x,py+(fz+4)/2)}}
@@ -645,19 +678,19 @@ function tickBubbles(){
     bx.font='700 '+fs+'px system-ui';bx.fillText(c.n,c.x,y0);
     if(hasC){bx.font='500 '+(fs*.78)+'px system-ui';bx.fillStyle='rgba(255,255,255,.85)';bx.fillText(contentOf(c,cf),c.x,y0+fs*1.15)}
   });
-  ripples.forEach(w=>{const k=(now-w.t)/700,rr=(w.big?Math.min(W,H)*.5:60)*k;bx.beginPath();bx.arc(w.x,w.y,rr,0,6.2832);bx.strokeStyle='rgba(120,170,255,'+(.5*(1-k))+')';bx.lineWidth=w.big?3:2;bx.stroke()});
+  ripples.forEach(w=>{const k=(now-w.t)/700,rr=w.r0?w.r0*(1+.6*k):(w.big?Math.min(W,H)*.5:60)*k;bx.beginPath();bx.arc(w.x,w.y,rr,0,6.2832);bx.strokeStyle='rgba(120,170,255,'+(.5*(1-k))+')';bx.lineWidth=w.big?3:2;bx.stroke()});
 }
 /* ---------- пальцем: схватить и бросить пузырь, удар по пустому месту — волна ---------- */
 let grab=null,ptr=null,ripples=[];
 const bpos=e=>{const r=bc.getBoundingClientRect();return {x:e.clientX-r.left,y:e.clientY-r.top,t:performance.now()}};
-function shock(x,y,pw){const R=Math.min(W,H)*.5;VIS.forEach(c=>{if(grab&&c===grab.c)return;const dx=c.x-x,dy=c.y-y,d=Math.hypot(dx,dy)||1;if(d>R)return;const f=pw*(1-d/R)*Math.sqrt(30/Math.max(8,c.r));c.vx+=dx/d*f;c.vy+=dy/d*f})}
+function shock(x,y,pw){const R=Math.min(W,H)*.5;VIS.forEach(c=>{if(grab&&c===grab.c)return;const dx=c.x-x,dy=c.y-y,d=Math.hypot(dx,dy)||1;if(d>R)return;const f=pw*(1-d/R)*Math.sqrt(30/Math.max(8,c.r));c.vx+=dx/d*f;c.vy+=dy/d*f;squish(c,dx/d,dy/d,f*.006)})}
 bc.style.touchAction='none';
 bc.addEventListener('pointerdown',e=>{
   const P=bpos(e);let hit=null,bd=1e9;VIS.forEach(c=>{const d=Math.hypot(c.x-P.x,c.y-P.y);if(d<=c.r+4&&d<bd){bd=d;hit=c}});
   $('#menu').style.display='none';$('#cpanel').style.display='none';
   try{bc.setPointerCapture(e.pointerId)}catch(_){}
   ptr={sx:P.x,sy:P.y,lx:P.x,ly:P.y,lt:P.t,moved:false,hit,lr:0};
-  if(hit){grab={c:hit,ox:hit.x-P.x,oy:hit.y-P.y,vx:0,vy:0}}
+  if(hit){grab={c:hit,ox:hit.x-P.x,oy:hit.y-P.y,vx:0,vy:0};hit.vs=(hit.vs||0)+.07;ripples.push({x:hit.x,y:hit.y,t:P.t,r0:hit.r})}
   else{shock(P.x,P.y,16);ripples.push({x:P.x,y:P.y,t:P.t,big:1})}
 });
 bc.addEventListener('pointermove',e=>{
@@ -666,13 +699,13 @@ bc.addEventListener('pointermove',e=>{
   if(grab){const c=grab.c,nx=Math.min(W-c.r,Math.max(c.r,P.x+grab.ox)),ny=Math.min(H-c.r,Math.max(c.r,P.y+grab.oy));
     grab.vx=(nx-c.x)*16/dt;grab.vy=(ny-c.y)*16/dt;c.x=nx;c.y=ny;c.vx=grab.vx;c.vy=grab.vy}
   else{/* ведём пальцем — пузыри отталкиваются по ходу движения */
-    const R=Math.min(W,H)*.22;VIS.forEach(c=>{const dx=c.x-P.x,dy=c.y-P.y,d=Math.hypot(dx,dy)||1;if(d>R+c.r)return;const k=(1-d/(R+c.r));c.vx+=(mx*.35+dx/d*3)*k;c.vy+=(my*.35+dy/d*3)*k});
+    const R=Math.min(W,H)*.22;VIS.forEach(c=>{const dx=c.x-P.x,dy=c.y-P.y,d=Math.hypot(dx,dy)||1;if(d>R+c.r)return;const k=(1-d/(R+c.r));c.vx+=(mx*.35+dx/d*3)*k;c.vy+=(my*.35+dy/d*3)*k;squish(c,dx/d,dy/d,k*.03)});
     if(P.t-ptr.lr>70){ptr.lr=P.t;ripples.push({x:P.x,y:P.y,t:P.t})}}
   ptr.lx=P.x;ptr.ly=P.y;ptr.lt=P.t;
 });
 const bup=e=>{
   if(!ptr)return;const p=ptr;ptr=null;
-  if(grab){const c=grab.c;grab=null;if(!p.moved){openCoin(c.s);return}c.vx=Math.max(-40,Math.min(40,c.vx));c.vy=Math.max(-40,Math.min(40,c.vy))}
+  if(grab){const c=grab.c;grab=null;c.vs=(c.vs||0)-.05;if(!p.moved){openCoin(c.s);return}c.vx=Math.max(-40,Math.min(40,c.vx));c.vy=Math.max(-40,Math.min(40,c.vy))}
 };
 bc.addEventListener('pointerup',bup);bc.addEventListener('pointercancel',bup);
 
@@ -1019,16 +1052,31 @@ $('#coin').oninput=e=>{
   if(e.target.id==='cv1')updCoin();
   else if(e.target.id==='cv2'){const v=$('#cv1');if(v)v.value=isNaN(a)||!CC.p?'':cm(String(+(a/CC.p).toFixed(8)))}
 };
+/* системная кнопка «Назад»: закрываем самое верхнее видимое окно; 1 — закрыли, 0 — уже главный экран */
+const cbVis=e=>!!e&&e.getClientRects().length>0;
 window.cbBack=()=>{
-  if($('#cv').style.display==='flex'){
-    if($('#ipanel').style.display==='block'){$('#indb').click();return 1}
-    if($('#panel').style.display==='flex'){$('#panel').style.display='none';return 1}
-    if($('#dbar').style.display==='flex'){$('#drb').click();return 1}
-    $('#back').click();return 1}
-  if($('#coin').style.display==='block'){closeCoin();return 1}
-  if(blOpen){blOpen=false;applyBL();return 1}
-  for(const id of ['#news','#spanel','#lst','#cpanel','#menu']){const e=$(id);if(e.style.display==='block'){e.style.display='none';return 1}}
-  return 0;
+  try{
+    const t=$('#toast');if(cbVis(t))t.style.display='none';
+    if(cbVis($('#cv'))){
+      if(cbVis($('#ipanel'))){$('#indb').click();return 1}
+      if(cbVis($('#panel'))){$('#panel').style.display='none';return 1}
+      if(cbVis($('#dbar'))){$('#drb').click();return 1}
+      $('#back').click();return 1}
+    /* окна поверх пузырей — сначала самые верхние (настройки, новости, поиск, карточка монеты) */
+    for(const id of ['#spanel','#news','#lst']){const e=$(id);if(cbVis(e)){e.style.display='none';return 1}}
+    if(cbVis($('#coin'))){closeCoin();return 1}
+    for(const id of ['#cpanel','#menu']){const e=$(id);if(cbVis(e)){e.style.display='none';return 1}}
+    if(blOpen){blOpen=false;applyBL();return 1}
+    if(!cbVis($('#bub'))){$('#bub').style.display='flex';return 1}
+    return 0;
+  }catch(e){try{cbHideAll()}catch(_){}return 1}
+};
+/* аварийный вариант: спрятать все всплывающие окна и вернуться к пузырям */
+window.cbHideAll=()=>{
+  ['#spanel','#news','#lst','#cpanel','#menu','#toast'].forEach(id=>{const e=$(id);if(e)e.style.display='none'});
+  try{if(CC)closeCoin()}catch(_){}
+  if(cbVis($('#cv'))){try{$('#back').click()}catch(_){$('#cv').style.display='none'}}
+  $('#bub').style.display='flex';
 };
 /* ---------- CHART + WALLS ---------- */
 let statT=null,stats={},candles=[],pollT=null,lastDepth=0,dbgT=0,prec=2,midP=0,vol,lastC,chart,series,cur=null,gen=0,sock=null,bids=new Map(),asks=new Map(),synced=false,list=[],lastCalc=0,prof=[],bookLo=0,bookHi=0,lastSide=0,lastScr=0,sideInit=false,CM='spot',sock2=null;
