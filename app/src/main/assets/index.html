@@ -223,7 +223,7 @@ select,input{outline:none}select:focus,input:focus{border-color:var(--ac)}
   <div id="bar">
     <div class="r1"><button id="back" aria-label="Назад">‹</button><div class="tt"><span id="ttl"></span><div class="sub"><span id="st">● нет связи</span><span id="dbg"></span></div></div><button id="vw" class="tv">TV</button><button id="gear" aria-label="Настройки">⚙</button></div>
     <div class="r2"><div id="tfs"><button data-tf="1m">1м</button><button data-tf="5m">5м</button><button data-tf="15m">15м</button><button data-tf="1h">1ч</button><button data-tf="4h">4ч</button><button data-tf="1d">1д</button><button data-tf="1w">1н</button></div></div>
-    <div class="r3"><button id="ladb" class="tl">▤ Стакан</button><button id="patb" class="tl">△ Фигуры</button><button id="drb" class="tl">✏ Рисовать</button><button id="indb" class="tl">ƒx Индик.</button></div>
+    <div class="r3"><button id="ladb" class="tl" style="display:none"></button><button id="patb" class="tl">△ Фигуры</button><button id="drb" class="tl">✏ Рисовать</button><button id="indb" class="tl">ƒx Индик.</button></div>
   </div>
   <div id="dbar"></div><div id="ipanel"></div>
   <div id="panel">
@@ -231,7 +231,7 @@ select,input{outline:none}select:focus,input:focus{border-color:var(--ac)}
     <div class="sec"><h4>📈 График</h4>
       <label>История <select id="hist"><option value="week">Неделя</option><option value="month">Месяц</option><option value="year">Год</option></select></label>
     </div>
-    <div class="sec"><h4>🐋 Линии китов на графике</h4>
+    <div style="display:none"><div class="sec"><h4>🐋 Линии китов на графике</h4>
       <label>Линий на сторону <input id="topn" type="number" min="1" max="50" style="width:60px"></label>
       <label>Мин. сумма $ <input id="minUsd" type="number" min="0" step="10000" placeholder="не задано"></label>
       <label><input id="sb" type="checkbox"> Покупки</label><label><input id="sa" type="checkbox"> Продажи</label>
@@ -242,7 +242,7 @@ select,input{outline:none}select:focus,input:focus{border-color:var(--ac)}
       <label><input id="sfit" type="checkbox"> Вместить весь стакан в график</label>
       <label>Шаг кластера <select id="bucket"><option>0.02</option><option>0.05</option><option>0.1</option><option>0.25</option><option>0.5</option><option>1</option></select>%</label>
       <label>Диапазон ±<select id="range"><option>1</option><option>2</option><option>5</option><option>10</option><option>20</option><option>50</option><option value="100">100 (весь)</option></select>%</label>
-    </div>
+    </div></div>
     <div class="sec"><h4>△ Фигуры теханализа</h4>
       <label><input id="pt" type="checkbox"> Показывать фигуры</label>
       <label>Таймфрейм <select id="ptf"><option value="1h">1 час</option><option value="4h">4 часа</option><option value="1d">1 день</option><option value="1w">1 неделя</option><option value="chart">как на графике</option></select></label>
@@ -1100,26 +1100,17 @@ async function load(){
     indDirty=1;patT=0;keep();
     const t1=candles[candles.length-1].t;try{chart.timeScale().setVisibleRange({from:Math.max(candles[0].t,t1-HD*86400),to:t1})}catch(e){}
   }catch(e){}})();
-  let buf=[];lastDepth=0;startPoll(sym,my);startStats(sym,my);
+  let buf=[];lastDepth=0;startStats(sym,my);
   let got=false;const fut=CM==='fut';
-  sock=new WebSocket(fut?`${FWS}/market/stream?streams=${s}@kline_${tf}`:`${HOSTS[hi][1]}/stream?streams=${s}@kline_${tf}/${s}@depth@100ms`);
-  if(fut)sock2=new WebSocket(`${FWS}/public/stream?streams=${s}@depth@100ms`);
+  sock=new WebSocket(fut?`${FWS}/market/stream?streams=${s}@kline_${tf}`:`${HOSTS[hi][1]}/stream?streams=${s}@kline_${tf}`);
   const onm=e=>{
     got=true;const m=JSON.parse(e.data);
     if(m.stream.includes('@kline')){const q=m.data.k,cd={time:q.t/1000,open:+q.o,high:+q.h,low:+q.l,close:+q.c};lastC=cd;{const L=candles[candles.length-1];if(L&&L.t===cd.time){L.h=cd.high;L.l=cd.low;L.c=cd.close;L.v=+q.v}else candles.push({t:cd.time,o:cd.open,h:cd.high,l:cd.low,c:cd.close,v:+q.v})}series.update(cd);indLive=1;vol.update({time:q.t/1000,value:+q.v,color:+q.c>=+q.o?'rgba(38,166,154,.5)':'rgba(239,83,80,.5)'});legend()}
     else{lastDepth=Date.now();if(!synced)buf.push(m.data);else applyDepth(m.data)}
   };
   sock.onmessage=onm;if(sock2)sock2.onmessage=onm;
-  (fut?sock2:sock).onopen=async()=>{
-    try{
-      const d=await apiD(CM,sym,5000);
-      if(my!==gen)return;
-      bids.clear();asks.clear();d.bids.forEach(([p,q])=>bids.set(p,+q));d.asks.forEach(([p,q])=>asks.set(p,+q));bookU=d.lastUpdateId||0;
-      buf.filter(x=>x.u>d.lastUpdateId).forEach(applyDepth);buf=[];synced=true;setStatus(true);
-    }catch(e){}
-  };
+  sock.onopen=()=>{if(my===gen)setStatus(true)};
   sock.onclose=()=>{if(!got)hi=(hi+1)%HOSTS.length;setStatus(false);setTimeout(()=>my===gen&&cur&&load(),2000)};
-  if(sock2)sock2.onclose=sock.onclose;
 }
 const PAL=[['#1a1ad6','#8ab8f0'],['#e8920c','#f0cf6a'],['#14b100','#8fdc8a'],['#9a1fcc','#cfa0e6'],['#00897b','#80cbc4'],['#c2185b','#f48fb1'],['#5d4037','#bcaaa4'],['#546e7a','#b0bec5']];
 function parseRows(str){
@@ -1376,9 +1367,9 @@ function draw0(){
   if(ov.width!==w*dpr||ov.height!==h*dpr){ov.width=w*dpr;ov.height=h*dpr;ov.style.width=w+'px';ov.style.height=h+'px'}
   ox.setTransform(dpr,0,0,dpr,0,0);ox.clearRect(0,0,w,h);
   const now=performance.now();
-  if(synced&&now-lastCalc>120){lastCalc=now;calcWalls(now);if(S.view==='tv'||S.lad)renderSide(now)}
+  list=[];fading=[];
   fading=fading.filter(f=>now-f.t<1400);
-  if(now-dbgT>500){dbgT=now;dbg('стакан '+bids.size+'/'+asks.size+' · линий '+list.length+(S.pt&&PATS.length?' · фигуры: '+PATS.map(p=>p.short).join(', '):''));renderStat()}
+  if(now-dbgT>500){dbgT=now;dbg(S.pt&&PATS.length?'фигуры: '+PATS.map(p=>p.short).join(', '):'');renderStat()}
   let pw=60;try{pw=chart.priceScale('right').width()||60}catch(e){}
   const right=w-pw,maxU=Math.max(1,...list.map(x=>x.usd)),maxLen=right*.45;
   const coin=cur.replace('USDT',''),fq=n=>n>=1e6?(n/1e6).toFixed(2)+'M':n>=1e3?(n/1e3).toFixed(1)+'K':n>=1?n.toFixed(2):n.toPrecision(3);
@@ -1397,7 +1388,7 @@ function draw0(){
   if(indDirty&&now-indT>800){indT=now;indDirty=0;indLive=0;try{updInd()}catch(e){}}
   else if(indLive&&now-indT>1000){indT=now;indLive=0;try{updIndLast()}catch(e){indDirty=1}}
   if(S.pt){if(now-patT>3000){patT=now;loadPC();const src=patTf()===S.tf?candles:PC;try{PATS=src?findPats(src):[];PSRC=src}catch(e){PATS=[]}}if(PSRC)drawPats(w,h,right)}
-  if(S.prof&&prof.length){
+  if(false){
     let pt=series.coordinateToPrice(0),pb=series.coordinateToPrice(h);
     if(pt!=null&&pb!=null){if(pt<pb){const x=pt;pt=pb;pb=x}
       let mu=1;prof.forEach(w=>{if(w.usd>mu)mu=w.usd});const ml=right*.34;
@@ -1689,7 +1680,7 @@ function renderSide(now){
   $('#lcnt').textContent='шаг '+stp.toFixed(dec);
   const v=String(S.lg||0),g=$('#lgs');if(g.value!==v&&document.activeElement!==g)g.value=v;
 }
-function applySide(){$('#side').style.display=(S.view==='tv'||S.lad)?'flex':'none';$('#ladb').classList.toggle('on',!!S.lad)}
+function applySide(){S.lad=false;S.prof=false;S.fit=false;$('#side').style.display='none';$('#ladb').classList.toggle('on',!!S.lad)}
 ['wheel','touchmove','pointerdown'].forEach(e=>$('#side').addEventListener(e,()=>{lastScr=performance.now()},{passive:true}));
 function loadS(sym){
   let o=null;try{o=JSON.parse(localStorage.getItem('cbw:'+sym)||'null')}catch(e){}
