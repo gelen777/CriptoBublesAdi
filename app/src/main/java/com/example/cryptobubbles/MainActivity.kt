@@ -12,6 +12,7 @@ import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import java.io.File
+import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -84,6 +85,22 @@ class MainActivity : Activity() {
     inner class Bridge {
         @JavascriptInterface fun reload() { runOnUiThread { loadApp() } }
         @JavascriptInterface fun check() { checkUpdate(true) }
+        /* сетевой запрос из приложения, без ограничений браузера (CORS): нужен для истории фьючерсов */
+        @JavascriptInterface fun get(id: Int, url: String, ms: Int) {
+            Thread {
+                var code = 0; var txt = ""
+                try {
+                    val c = (URL(url).openConnection() as HttpURLConnection).apply {
+                        connectTimeout = ms; readTimeout = ms * 2
+                        setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android) CryptoBubbles")
+                        setRequestProperty("Accept", "application/json")
+                    }
+                    code = c.responseCode
+                    txt = (if (code in 200..299) c.inputStream else c.errorStream)?.bufferedReader()?.use { it.readText() } ?: ""
+                } catch (e: Exception) { code = 0; txt = e.toString() }
+                js("window.__nr&&__nr($id,$code," + JSONObject.quote(txt) + ")")
+            }.start()
+        }
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
