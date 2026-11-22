@@ -277,12 +277,25 @@ async function bj(path){
   }
   try{return await viaWs(path)}catch(e){throw new Error('net')}
 }
-let fRestBad=0;
+let fRestBad=0,nHost=null;
+/* запрос через само приложение (Android): без ограничений браузера, пробует несколько адресов Binance */
+const NR=new Map();let nrN=0;
+window.__nr=(id,code,txt)=>{const p=NR.get(id);if(!p)return;NR.delete(id);clearTimeout(p.t);code>=200&&code<300?p.ok(txt):p.no(new Error('http '+code))};
+const nget=(url,ms)=>new Promise((ok,no)=>{const id=++nrN;NR.set(id,{ok,no,t:setTimeout(()=>{NR.delete(id);no(new Error('timeout'))},ms*3+1000)});try{Android.get(id,url,ms)}catch(e){NR.delete(id);no(e)}});
+const HFN=HF.concat(['https://fapi3.binance.com','https://www.binance.com']);
+async function nativeF(path){
+  if(!(window.Android&&Android.get))throw new Error('no native');
+  if(nHost)try{return JSON.parse(await nget(nHost+path,5000))}catch(e){nHost=null}
+  return await Promise.any(HFN.map(async h=>{const r=JSON.parse(await nget(h+path,6000));if(r&&r.code&&r.msg)throw new Error(r.msg);if(!nHost)nHost=h;return r}));
+}
 async function bjf(path,restOnly){
   if(!useWsF||restOnly||Date.now()-fRestBad>90000){
     try{const r=await Promise.any(HF.map(async h=>{const c=new AbortController(),t=setTimeout(()=>c.abort(),4000);try{const r=await fetch(h+path,{signal:c.signal});if(!r.ok)throw 0;return await r.json()}finally{clearTimeout(t)}}));useWsF=false;return r}
-    catch(e){fRestBad=Date.now();if(restOnly)throw new Error('net');useWsF=true}
+    catch(e){
+      try{const r=await nativeF(path);useWsF=false;return r}catch(e2){}
+      fRestBad=Date.now();if(restOnly)throw new Error('net');useWsF=true}
   }
+  else if(/klines|ticker\/24hr/.test(path)&&window.Android&&Android.get){try{return await nativeF(path)}catch(e){}}
   try{return await viaWsF(path)}catch(e){throw new Error('net')}
 }
 const apiK=(m,sym,iv,lim,end)=>{const e=end?'&endTime='+end:'';return m==='fut'?bjf(`/fapi/v1/klines?symbol=${sym}&interval=${iv}&limit=${lim}${e}`):bj(`/api/v3/klines?symbol=${sym}&interval=${iv}&limit=${lim}${e}`)};
@@ -1005,6 +1018,7 @@ async function load(){
     const pp=(coins.get(sym)||{}).p;
     if(CM!=='fut'||!pp)return setTimeout(()=>my===gen&&load(),2000);
     const sc=TS,t0=Math.floor(Date.now()/1000/sc)*sc*1000;k=[[t0,pp,pp,pp,pp,0]];
+    if(!window.__nh){window.__nh=1;toast(window.Android&&Android.get?'История фьючерсов сейчас недоступна — сеть блокирует Binance Futures. Попробуйте Wi‑Fi или VPN':'Нет истории фьючерсов в этой сети — установите новый APK, он умеет загружать её в обход')}
   }
   if(my!==gen)return;
   const last=+k[k.length-1][4],p=last>=1000?2:last>=1?4:last>=.01?6:8;
