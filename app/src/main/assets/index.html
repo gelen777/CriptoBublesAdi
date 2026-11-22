@@ -1051,7 +1051,7 @@ const MON=['янв','фев','мар','апр','май','июн','июл','ав�
 async function openChart(sym,view){
   cur=sym;CM=AS.mkt;loadS(sym);if(view)S.view=view;syncUI();$('#bub').style.display='none';$('#cv').style.display='flex';
   $('#ttl').innerHTML=esc(sym.replace('USDT','/USDT'))+(CM==='fut'?'<small class="mk">ФЬЮЧ</small>':'<small class="mk">СПОТ</small>');markTf();try{markFav()}catch(e){}
-  setView(S.view);
+  if(S.view==='tv')S.view='own';setView(S.view);
   if(!chart){
     const ok=await lwcReady;if(cur!==sym)return;if(chart){chart.applyOptions({watermark:{visible:true,fontSize:48,horzAlign:'center',vertAlign:'center',color:'rgba(120,123,134,.12)',text:sym.replace('USDT','/USDT')}});return load()}
     if(!ok){$('#chart').innerHTML='<div style="padding:20px;color:#ef5350">Не удалось загрузить библиотеку графика. Проверь интернет или VPN, либо нажми TradingView.</div>';return}
@@ -1720,7 +1720,9 @@ function syncUI(){
 }
 /* ---------- UI ---------- */
 $('#back').onclick=()=>{gen++;cur=null;closeSock();$('#cv').style.display='none';$('#bub').style.display='flex'};
-$('#vw').onclick=()=>setView(S.view==='tv'?'own':'tv')
+/* TW: открыть эту монету в вашем TradingView (приложение или сайт, где вы уже вошли в свой аккаунт) */
+const twUrl=()=>{const iv={'1m':'1','5m':'5','15m':'15','1h':'60','4h':'240','1d':'D','1w':'W'}[S.tf]||'15';return 'https://www.tradingview.com/chart/?symbol='+encodeURIComponent('BINANCE:'+cur+(CM==='fut'?'.P':''))+'&interval='+iv};
+$('#vw').onclick=()=>{if(!cur)return;const u=twUrl();if(window.Android)location.href=u;else window.open(u,'_blank')}
 const markFav=()=>{const on=!!cur&&LISTS.fav.includes(cur),b=$('#fstar');b.classList.toggle('on',on);b.textContent=on?'★':'☆'};
 $('#fstar').onclick=()=>{if(!cur)return;const i=LISTS.fav.indexOf(cur);i<0?LISTS.fav.push(cur):LISTS.fav.splice(i,1);saveAll();markFav();toast(i<0?'★ '+cur.replace('USDT','')+' добавлена в избранное':'Убрана из избранного');try{renderBL&&renderBL()}catch(e){}};
 {const st=$('#stat');let drag=null;
