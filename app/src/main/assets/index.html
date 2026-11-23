@@ -96,6 +96,8 @@ button{cursor:pointer}
 #blist .br{display:flex;align-items:center;gap:8px;padding:9px 8px;border-bottom:1px solid #151a24;cursor:pointer}
 #blist .br:active{background:#161c28}
 #blist .br img{width:24px;height:24px;border-radius:50%;flex:none;background:#1a1f2b}
+.lgw{position:relative;width:24px;height:24px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;overflow:hidden}.lgw i{font-style:normal;font-weight:800;font-size:8.5px;color:#fff;letter-spacing:-.2px}#blist .lgw img{position:absolute;inset:0;width:100%;height:100%;opacity:0;background:transparent}.lgw.ok img{opacity:1}.lgw.ok{background:#1a1f2b!important}.lgw.ok i{display:none}
+#blist .bq{display:flex;justify-content:space-between;align-items:center;padding:4px 10px;font-size:11px;color:#8b93a7;background:rgba(255,213,79,.06)}#blist .bq button{background:transparent;border:1px solid #3a4256;border-radius:10px;color:#d6dae3;font-size:11px;padding:3px 9px}
 #blist .bm{flex:1;min-width:0}#blist .bm div{display:flex;align-items:center;gap:4px;white-space:nowrap;overflow:hidden}
 #blist .bm b{font-size:14px;overflow:hidden;text-overflow:ellipsis}#blist .bm em{font-style:normal;font-size:9px;color:#aab2c5;border:1px solid #3a4256;border-radius:3px;padding:0 3px;flex:none}
 #blist .bm small{display:block;color:#8b93a7;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -419,12 +421,21 @@ async function loadMarkets(){
   setTimeout(loadMarkets,600000);
 }
 const IMG=new Map();let imgBudget=0;
+/* логотипы: общий список источников (по очереди, пока какой-нибудь не загрузится) */
+const LOGO={};
+function logoSrcs(c){const n=bn(c.n),b=n.toLowerCase();
+  return [LOGO[c.n],c.img,'https://bin.bnbstatic.com/static/assets/logos/'+n+'.png','https://assets.coincap.io/assets/icons/'+b+'@2x.png',
+    'https://cdn.jsdelivr.net/gh/vadimmalykhin/binance-icons/crypto/'+b+'.svg','https://cdn.jsdelivr.net/gh/spothq/cryptocurrency-icons@master/32/color/'+b+'.png',
+    'https://s3-symbol-logo.tradingview.com/crypto/XTVC'+n+'.svg'].filter((x,i,a)=>x&&a.indexOf(x)===i)}
 function logoOf(c){
   let e=IMG.get(c.n);
-  if(!e){if(imgBudget<=0)return null;imgBudget--;e={im:new Image(),ok:false,t:0};
-    e.im.onload=()=>{e.ok=true};
-    e.im.onerror=()=>{if(!e.t&&c.img){e.t=1;e.im.src=c.img}};
-    e.im.src='https://cdn.jsdelivr.net/gh/spothq/cryptocurrency-icons@master/32/color/'+bn(c.n).toLowerCase()+'.png';IMG.set(c.n,e)}
+  /* не нашли ни одного логотипа — через 2 минуты пробуем снова (раньше пропадал навсегда) */
+  if(e&&e.f&&Date.now()-e.f>120000){IMG.delete(c.n);e=null}
+  if(!e){if(imgBudget<=0)return null;imgBudget--;const L=logoSrcs(c);e={im:new Image(),ok:false,k:0,f:0};
+    e.im.onload=()=>{e.ok=true;if(!LOGO[c.n])LOGO[c.n]=e.im.src};
+    e.im.onerror=()=>{e.k++;if(e.k<L.length)e.im.src=L[e.k];else e.f=Date.now()};
+    if(L.length)e.im.src=L[0];else e.f=Date.now();IMG.set(c.n,e)}
+  if(!e.ok&&LOGO[c.n]&&e.k===0&&e.im.src!==LOGO[c.n]){e.im.src=LOGO[c.n]}
   return e.ok?e.im:null;
 }
 
@@ -895,38 +906,54 @@ function blData(){
   return v.slice(0,200);
 }
 /* логотип: пробуем несколько источников по очереди */
-const LOGO={};
-function lgNext(i){const a=(i.dataset.a||'').split('|').filter(Boolean);if(!a.length){i.style.visibility='hidden';i.onerror=null;LOGO[i.dataset.n]='';return}i.dataset.a=a.slice(1).join('|');i.src=a[0]}
-function lgOk(i){LOGO[i.dataset.n]=i.src}
+/* каждая иконка создаётся один раз и потом просто переставляется — не мигает и не пропадает при обновлении списка.
+   Пока картинка грузится (или если её нигде нет) — цветной кружок с буквами монеты */
+const LIMG=new Map();
+function listLogo(c){
+  let w=LIMG.get(c.n);if(w)return w;
+  const n=bn(c.n);let h=0;for(const ch of n)h=(h*31+ch.charCodeAt(0))%360;
+  w=document.createElement('span');w.className='lgw';w.style.background='hsl('+h+',45%,32%)';
+  const t=document.createElement('i');t.textContent=n.slice(0,n.length>4?3:4);w.appendChild(t);
+  const im=new Image();im.alt='';im.decoding='async';let L=logoSrcs(c),k=0;
+  im.onload=()=>{LOGO[c.n]=im.src;w.classList.add('ok')};
+  im.onerror=()=>{k++;if(k<L.length)im.src=L[k];else setTimeout(()=>{L=logoSrcs(c);k=0;if(L.length)im.src=L[0]},120000)};
+  if(L.length)im.src=L[0];w.appendChild(im);LIMG.set(c.n,w);return w;
+}
 function renderBL(){
   const el=$('#blist');if(!el||el.classList.contains('off'))return;
-  if(!el._k){el._k=1;el.innerHTML='<div class="bs"><input id="blq" placeholder="🔍 Поиск" autocomplete="off"><button class="bx" title="Закрыть">✕</button></div>'
+  if(!el._k){el._k=1;el.innerHTML='<div class="bs"><input id="blq" placeholder="🔍 Поиск" autocomplete="off"><button class="bx" title="Закрыть список">✕</button></div>'
     +'<div class="bh">'+[['all','Все'],['new','Новое'],['fav','Избранное'],['crypto','Crypto'],['tradfi','TradFi']].map(([k,l])=>'<button data-t="'+k+'">'+l+'</button>').join('')+'</div>'
-    +'<div class="bsort"><span><span data-o="name">Название</span> / <span data-o="vol">Объём</span></span><span><span data-o="price">Цена</span> / <span data-o="ch">Изм. 24ч</span></span></div><div class="bl"></div>';
+    +'<div class="bq"><span></span><button class="bqx">✕ Сбросить поиск</button></div><div class="bsort"><span><span data-o="name">Название</span> / <span data-o="vol">Объём</span></span><span><span data-o="price">Цена</span> / <span data-o="ch">Изм. 24ч</span></span></div><div class="bl"></div>';
     $('#blq').oninput=e=>{blQ=e.target.value;renderBL()}}
   el.querySelectorAll('.bh [data-t]').forEach(b=>b.classList.toggle('on',b.dataset.t===blTab));
   el.querySelectorAll('.bsort [data-o]').forEach(x=>{const on=x.dataset.o===blSort;x.classList.toggle('on',on);x.textContent=x.textContent.replace(/ [▲▼]$/,'')+(on?(blDir<0?' ▼':' ▲'):'')});
   const L=el.querySelector('.bl'),st=L.scrollTop,v=blData(),fut=AS.mkt==='fut';
-  L.innerHTML=v.length?v.map(c=>{const d=ch24(c),sg=sigOf(c),b0=bn(c.n).toLowerCase(),alts=[c.img,'https://assets.coincap.io/assets/icons/'+b0+'@2x.png','https://cdn.jsdelivr.net/gh/vadimmalykhin/binance-icons/crypto/'+b0+'.svg','https://cdn.jsdelivr.net/gh/spothq/cryptocurrency-icons@master/32/color/'+b0+'.png'].filter(Boolean);
-    const lk=LOGO[c.n],im=lk===''?'<img style="visibility:hidden">':lk?'<img src="'+esc(lk)+'">':'<img loading="lazy" src="'+esc(alts[0])+'" data-n="'+esc(c.n)+'" data-a="'+esc(alts.slice(1).join('|'))+'" onerror="lgNext(this)" onload="lgOk(this)">';
-    return '<div class="br" data-s="'+c.s+'">'+im
+  const qq=blQ.trim(),qb=el.querySelector('.bq');
+  qb.style.display=qq?'flex':'none';if(qq)qb.firstChild.textContent='Поиск «'+qq+'»: найдено '+v.length;
+  L.innerHTML=v.length?v.map(c=>{const d=ch24(c),sg=sigOf(c);
+    return '<div class="br" data-s="'+c.s+'"><span class="lgs"></span>'
       +'<div class="bm"><div><b>'+esc(c.n)+'USDT</b>'+(fut?'<em>Бесср</em>':'')+(isNew(c)?'<em style="color:#ffd54f;border-color:#ffd54f">NEW</em>':'')+(sg?'<i class="sg" style="display:inline-block;width:7px;height:7px;border-radius:50%;animation:nbl 1s infinite;background:'+(sg.dir==='buy'?'#26dc96':sg.dir==='sell'?'#ff4646':'#ffd54f')+'"></i>':'')+'</div>'
       +'<small>'+(c.nm&&c.nm.toUpperCase()!==c.n?esc(c.nm)+' | ':'')+fVolRu(c.vol)+'</small></div>'
-      +'<div class="bp"><b>'+fPr(c.p)+'</b><span class="'+(d>=0?'up':'dn')+'">'+(d>=0?'+':'')+cm(d.toFixed(2))+'%</span></div></div>'}).join(''):'<div class="pad" style="font-size:12px;color:#8b93a7">Пусто</div>';
+      +'<div class="bp"><b>'+fPr(c.p)+'</b><span class="'+(d>=0?'up':'dn')+'">'+(d>=0?'+':'')+cm(d.toFixed(2))+'%</span></div></div>'}).join('')
+    :'<div class="pad" style="font-size:13px;color:#8b93a7;text-align:center;padding:24px 12px">'+(!coins.size?'⏳ Загружаю монеты Binance…<br><small>если долго — проверьте интернет/VPN</small>'
+      :qq?'Ничего не найдено по «'+esc(qq)+'»<br><br><button class="bqx" style="background:#1a1f2b;border:1px solid #3a4256;border-radius:10px;color:#d6dae3;padding:7px 14px">Сбросить поиск</button>'
+      :blTab==='fav'?'В избранном пока пусто — нажмите ☆ в карточке монеты':blTab==='new'?'Новых монет сейчас нет':'Пусто')+'</div>';
+  L.querySelectorAll('.br').forEach(r=>{const c=coins.get(r.dataset.s),sp=r.firstChild;if(c&&sp)sp.replaceWith(listLogo(c))});
   L.scrollTop=st;
 }
 $('#blist').onclick=e=>{
   const o=e.target.closest('[data-o]');if(o){if(blSort===o.dataset.o)blDir=-blDir;else{blSort=o.dataset.o;blDir=o.dataset.o==='name'?1:-1}LS.set('cbBlS',blSort);LS.set('cbBlD',blDir);$('#blist .bl').scrollTop=0;renderBL();return}
   const b=e.target.closest('button');
+  if(b&&b.classList.contains('bqx')){blQ='';$('#blq').value='';$('#blist .bl').scrollTop=0;renderBL();return}
   if(b){if(b.dataset.t){blTab=b.dataset.t;LS.set('cbBlT',blTab);$('#blist .bl').scrollTop=0;renderBL()}
     else if(b.id==='blfull'){$('#blist').classList.toggle('full');b.textContent=$('#blist').classList.contains('full')?'⤡':'⤢';renderBL()}
-    else if(b.classList.contains('bx')){blOpen=false;applyBL()}return}
+    else if(b.classList.contains('bx')){if(blQ){blQ='';$('#blq').value='';renderBL()}else{blOpen=false;applyBL()}}return}
   const r=e.target.closest('.br');if(r)openCoin(r.dataset.s)};
 /* список монет спрятан в кнопку ☰ сверху и открывается поверх пузырей */
 let blOpen=false;
-function applyBL(){const el=$('#blist');el.classList.toggle('off',!blOpen);el.classList.add('full');$('#blopen').style.display='none';$('#blst').classList.toggle('on',blOpen);if(blOpen){$('#blist .bl')&&($('#blist .bl').scrollTop=0);renderBL()}}
+function applyBL(){const el=$('#blist');if(!blOpen&&blQ){blQ='';const q=$('#blq');if(q)q.value=''}el.classList.toggle('off',!blOpen);el.classList.add('full');$('#blopen').style.display='none';$('#blst').classList.toggle('on',blOpen);if(blOpen){$('#blist .bl')&&($('#blist .bl').scrollTop=0);renderBL()}}
 $('#blopen').onclick=()=>{blOpen=true;applyBL()};
-setInterval(()=>{if($('#bub').style.display!=='none'&&document.activeElement!==$('#blq'))renderBL()},1500);
+setInterval(()=>{if($('#bub').style.display!=='none'&&blOpen)renderBL()},1500);
 applyBL();
 /* обновление приложения прямо внутри (без переустановки): новая версия скачивается с GitHub */
 let updReady=false;
