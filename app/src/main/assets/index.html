@@ -98,7 +98,7 @@ button{cursor:pointer}
 #blist .br img{width:24px;height:24px;border-radius:50%;flex:none;background:#1a1f2b}
 .lgw{position:relative;width:24px;height:24px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;overflow:hidden}.lgw i{font-style:normal;font-weight:800;font-size:8.5px;color:#fff;letter-spacing:-.2px}#blist .lgw img{position:absolute;inset:0;width:100%;height:100%;opacity:0;background:transparent}.lgw.ok img{opacity:1}.lgw.ok{background:#1a1f2b!important}.lgw.ok i{display:none}
 #csz .h3{margin-top:14px}#csz .szh{font-size:11px;color:#8b93a7;margin:8px 0 4px}#csz .szp{font-size:12px;color:#ffd54f;font-weight:700;margin:8px 0;padding:4px 8px;border-left:3px solid #ffd54f;background:rgba(255,213,79,.06);border-radius:4px}#csz .szr{padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05)}#csz .szl{position:relative;display:flex;justify-content:space-between;gap:8px;padding:3px 8px 6px;border-left:3px solid;font-size:13px}#csz .szl i{position:absolute;left:8px;bottom:0;height:2px;border-radius:1px;max-width:calc(100% - 8px);opacity:.8}#csz small{display:block;color:#8b93a7;font-size:11px;padding:3px 8px 0 11px;line-height:1.35}#csz .szn{font-size:11px;color:#6c7488;padding:8px 2px;line-height:1.4}
-#blist .bkc{display:flex;gap:4px;align-items:center;padding:6px 8px 0;overflow-x:auto;scrollbar-width:none}#blist .bks{flex:1}#blist .bk{flex:none;background:#151a24;border:1px solid #232a3a;border-radius:9px;color:#aab2c5;font-size:11.5px;padding:5px 9px;white-space:nowrap}#blist .bk.on{background:#1f6f4f;border-color:#26a69a;color:#fff;font-weight:700}#blist .bkh{font-size:10.5px;color:#6c7488;padding:5px 10px}#blist .bkpr{height:3px;background:#1a1f2b;margin:6px 10px 0;border-radius:2px;overflow:hidden}#blist .bkpr i{display:block;height:100%;background:#26dc96;transition:width .3s}#blist .bkr small+small{color:#6c7488;font-size:10.5px}#blist .bkn{width:16px;flex:none;text-align:center;color:#6c7488;font-size:11px}#blist .bp b.bksc{display:inline-block;min-width:30px;text-align:center;border:1.5px solid;border-radius:14px;padding:1px 6px;font-size:14px;font-weight:800;margin-bottom:3px}#blist .bkr .bm small{white-space:normal}#blist .bkr .bp span{display:block;font-size:11px}#blist .bkr .bp{max-width:92px}
+#blist .bkc{display:flex;gap:4px;align-items:center;padding:6px 8px 0;overflow-x:auto;scrollbar-width:none}#blist .bks{flex:1}#blist .bk{flex:none;background:#151a24;border:1px solid #232a3a;border-radius:9px;color:#aab2c5;font-size:11.5px;padding:5px 9px;white-space:nowrap}#blist .bk.on{background:#1f6f4f;border-color:#26a69a;color:#fff;font-weight:700}#blist .bkh{font-size:10.5px;color:#6c7488;padding:5px 10px}#blist .bkpr{height:3px;background:#1a1f2b;margin:6px 10px 0;border-radius:2px;overflow:hidden}#blist .bkpr i{display:block;height:100%;background:#26dc96;transition:width .3s}#blist .bkr small+small{color:#6c7488;font-size:10.5px}#blist .bkr small.bktg{color:#ffd54f;font-size:11px}#blist .bkn{width:16px;flex:none;text-align:center;color:#6c7488;font-size:11px}#blist .bp b.bksc{display:inline-block;min-width:30px;text-align:center;border:1.5px solid;border-radius:14px;padding:1px 6px;font-size:14px;font-weight:800;margin-bottom:3px}#blist .bkr .bm small{white-space:normal}#blist .bkr .bp span{display:block;font-size:11px}#blist .bkr .bp{max-width:92px}
 #blist .bq{display:flex;justify-content:space-between;align-items:center;padding:4px 10px;font-size:11px;color:#8b93a7;background:rgba(255,213,79,.06)}#blist .bq button{background:transparent;border:1px solid #3a4256;border-radius:10px;color:#d6dae3;font-size:11px;padding:3px 9px}
 #blist .bm{flex:1;min-width:0}#blist .bm div{display:flex;align-items:center;gap:4px;white-space:nowrap;overflow:hidden}
 #blist .bm b{font-size:14px;overflow:hidden;text-overflow:ellipsis}#blist .bm em{font-style:normal;font-size:9px;color:#aab2c5;border:1px solid #3a4256;border-radius:3px;padding:0 3px;flex:none}
@@ -958,9 +958,25 @@ function brkAnalyze(k){
   });
   return best;
 }
+/* 🎯 цель после пробоя = ближайшая зона «где цена может остановиться» за уровнем; стоп — за ближайшей зоной с другой стороны.
+   Если до следующей зоны мало места — оценка снижается, если путь свободный — повышается. */
+async function brkTarget(r,mk,d,price){
+  try{const H=await szHist(mk,r.s),B=(d.bids||[]).map(([p,q])=>[+p,+p*q]),A=(d.asks||[]).map(([p,q])=>[+p,+p*q]);
+    const Z=szCalc(H,price,B,A),up=r.dir==='up',gap=.15*r.atr;
+    const after=Z.filter(z=>z.up===up&&(up?z.lo>r.lv+gap:z.hi<r.lv-gap)).sort((a,b)=>up?a.lo-b.lo:b.hi-a.hi);
+    const back=Z.filter(z=>z.up!==up&&(up?z.hi<Math.min(price,r.lv):z.lo>Math.max(price,r.lv))).sort((a,b)=>up?b.hi-a.hi:a.lo-b.lo);
+    const t1=after[0],t2=after[1],entry=r.lv;
+    const stop=back[0]?(up?back[0].lo:back[0].hi):(up?entry-1.5*r.atr:entry+1.5*r.atr);
+    const tp=t1?(up?t1.lo:t1.hi):null,risk=Math.abs(entry-stop),rew=tp!=null?Math.abs(tp-entry):null;
+    r.tg={tp,tp2:t2?(up?t2.lo:t2.hi):null,sc:t1?t1.sc:0,why:t1&&t1.tags[0]||'',stop,rr:rew!=null&&risk?rew/risk:null,free:!t1};
+    /* место для движения в ATR: меньше 1 ATR — почти некуда идти, больше 3 — простор */
+    const room=t1?rew/r.atr:6,adj=room<1?-8:room<2?-3:room>=4?5:room>=3?3:0;
+    r.sc=Math.max(0,Math.min(100,r.sc+adj));r.base.tg=adj;
+  }catch(e){}
+}
 /* стакан: перевес заявок рядом с ценой и крупная стенка на уровне */
 async function brkBook(r,mk){
-  try{const d=await apiD(mk,r.s,100),c=coins.get(r.s);if(!d||!c)return;const p=c.p,lv=r.lv,up=r.dir==='up',rg=Math.max(Math.abs(lv-p),p*.004)*1.6;
+  try{const d=await apiD(mk,r.s,1000),c=coins.get(r.s);if(!d||!c)return;await brkTarget(r,mk,d,c.p);const p=c.p,lv=r.lv,up=r.dir==='up',rg=Math.max(Math.abs(lv-p),p*.004)*1.6;
     const B=(d.bids||[]).map(x=>[+x[0],+x[0]*+x[1]]),A=(d.asks||[]).map(x=>[+x[0],+x[0]*+x[1]]);
     const sb=B.filter(x=>x[0]>=p-rg).reduce((s,x)=>s+x[1],0),sa=A.filter(x=>x[0]<=p+rg).reduce((s,x)=>s+x[1],0),imb=sb+sa?sb/(sb+sa):.5;
     const side=up?A:B,med=side.map(x=>x[1]).sort((a,b)=>a-b)[side.length>>1]||1,
@@ -980,7 +996,8 @@ async function brkScan(){
     BRK.done++;if(BRK.done%15===0)pub(false)}};
   try{await Promise.all([worker(),worker(),worker(),worker()]);
     if(g!==BRK.gen)return;out.sort((a,b)=>b.sc-a.sc);
-    for(const r of out.slice(0,15)){if(g!==BRK.gen)return;await brkBook(r,mk)}
+    const top=out.slice(0,20);let j=0;const w2=async()=>{while(j<top.length&&g===BRK.gen)await brkBook(top[j++],mk)};
+    await Promise.all([w2(),w2(),w2()]);if(g!==BRK.gen)return;
     pub(true);
   }finally{if(g===BRK.gen)BRK.busy=false}
 }
@@ -1012,20 +1029,28 @@ function brkView(L,q){
     return '<div class="br bkr" data-s="'+r.s+'" data-b="1"><span class="bkn">'+(i+1)+'</span><span class="lgs"></span>'
       +'<div class="bm"><div><b>'+esc(r.s)+'</b><em style="color:'+col+';border-color:'+col+'">'+(up?'▲ ЛОНГ':'▼ ШОРТ')+'</em>'
       +(r.state==='brk'?'<em style="color:#111;background:#ffd54f;border-color:#ffd54f">🔥 ПРОБОЙ</em>':'')+'</div>'
-      +'<small>'+tags.map(esc).join(' · ')+'</small><small>Уровень '+fPr(r.lv)+' · RSI '+Math.round(r.rsi)+'</small></div>'
+      +'<small>'+tags.map(esc).join(' · ')+'</small>'+brkTgHtml(r)+'<small>Уровень '+fPr(r.lv)+' · RSI '+Math.round(r.rsi)+'</small></div>'
       +'<div class="bp"><b class="bksc" style="color:'+scc+';border-color:'+scc+'">'+sc+'</b><span style="color:'+(r.state==='brk'?'#ffd54f':'#aab2c5')+'">'
       +(r.state==='brk'?'пробит':'до уровня '+cm(Math.max(0,r.dPct).toFixed(r.dPct<1?2:1))+'%')+'</span></div></div>'};
   L.innerHTML=head+(v.length?v.map(row).join('')
     :'<div class="pad" style="font-size:13px;color:#8b93a7;text-align:center;padding:24px 12px">'+(!coins.size?'⏳ Загружаю монеты…':BRK.busy?'Ищу монеты у пробоя…':'Сейчас нет монет рядом с пробоем — попробуйте другой таймфрейм')+'</div>')
-    +'<div class="bkh" style="padding:12px 10px 18px;line-height:1.45">Оценка 0–100: насколько цена близко к уровню (в ATR), сколько раз уровень проверяли, фигура теханализа, сжатие волатильности перед выстрелом, рост объёма, тренд на этом и старшем таймфрейме, RSI и стакан. Нажмите на монету — откроется график с линией пробоя. Это не финансовый совет: пробои бывают ложными, ставьте стоп.</div>';
+    +'<div class="bkh" style="padding:12px 10px 18px;line-height:1.45">Оценка 0–100: насколько цена близко к уровню (в ATR), сколько раз уровень проверяли, фигура теханализа, сжатие волатильности перед выстрелом, рост объёма, тренд на этом и старшем таймфрейме, RSI, стакан и сколько места до следующей зоны остановки. 🎯 Цель — ближайшая зона, где цена после пробоя может остановиться (киты в стакане, прошлые объёмы, развороты); стоп — за ближайшей зоной с другой стороны; R/R считается от уровня пробоя. Для 20 лучших монет. Нажмите на монету — откроется график с линией пробоя. Это не финансовый совет: пробои бывают ложными, ставьте стоп.</div>';
 }
-let brkLine=null,brkTfNext=null;
-function clrBrkLine(){if(brkLine&&series){try{series.removePriceLine(brkLine)}catch(e){}}brkLine=null}
+function brkTgHtml(r){const t=r.tg;if(!t)return '';const c=coins.get(r.s),p=c?c.p:r.lv,up=r.dir==='up';
+  if(t.free)return '<small class="bktg">🎯 Цель: сильных зон нет до ±10% — свободный путь · стоп '+fPr(t.stop)+'</small>';
+  const pc=(t.tp/p-1)*100,rr=t.rr?' · R/R 1:'+cm(t.rr.toFixed(1)):'';
+  return '<small class="bktg">🎯 Цель '+fPr(t.tp)+' ('+(pc>=0?'+':'')+cm(pc.toFixed(1))+'%)'+(t.tp2?' → '+fPr(t.tp2):'')+' · 🛑 стоп '+fPr(t.stop)+rr+'</small>'}
+let brkLine=null,brkLines=[],brkTfNext=null,BRKR=null;
+function clrBrkLine(){if(series)[brkLine,...brkLines].forEach(l=>{if(l)try{series.removePriceLine(l)}catch(e){}});brkLine=null;brkLines=[];BRKR=null}
 async function openBrk(sym){
   const r=BRK.res.find(x=>x.s===sym);brkTfNext=BRK.tf||BRK.cfg.tf;await openChart(sym);if(!r)return;
   for(let i=0;i<60&&(!series||cur!==sym);i++)await new Promise(z=>setTimeout(z,100));
   if(!series||cur!==sym)return;clrBrkLine();
   brkLine=series.createPriceLine({price:r.lv,color:r.dir==='up'?'#26dc96':'#ff4646',lineWidth:2,lineStyle:0,axisLabelVisible:true,title:'🎯 пробой '+(r.dir==='up'?'вверх':'вниз')});
+  const t=r.tg;if(t){if(t.tp!=null)brkLines.push(series.createPriceLine({price:t.tp,color:'#ffd54f',lineWidth:2,lineStyle:2,axisLabelVisible:true,title:'цель 1'}));
+    if(t.tp2!=null)brkLines.push(series.createPriceLine({price:t.tp2,color:'#ffd54f',lineWidth:1,lineStyle:2,axisLabelVisible:true,title:'цель 2'}));
+    {const ps=[r.lv,t.stop,t.tp,t.tp2].filter(x=>x!=null);BRKR={s:sym,lo:Math.min(...ps),hi:Math.max(...ps)};try{chart.priceScale('right').applyOptions({autoScale:true})}catch(e){}}
+    brkLines.push(series.createPriceLine({price:t.stop,color:'#9e9e9e',lineWidth:1,lineStyle:2,axisLabelVisible:true,title:'стоп'}))}
 }
 /* режим «🎯 Топ пробоев» в пузырях: держим результаты свежими */
 setInterval(()=>{if(AS.sort==='brk'&&!BRK.busy&&coins.size>20&&(BRK.mk!==AS.mkt||Date.now()-BRK.t>300000))brkScan()},20000);
@@ -1286,7 +1311,7 @@ async function openChart(sym,view){
       timeScale:{timeVisible:true,secondsVisible:false,borderColor:'#2a2e39',rightOffset:8,tickMarkFormatter:(t,k)=>{const d=new Date(t*1000);return k===0?String(d.getFullYear()):k===1?MON[d.getMonth()]:k===2?String(d.getDate()):p2(d.getHours())+':'+p2(d.getMinutes())}},
       crosshair:{mode:0,vertLine:{color:'#758696',style:3,labelBackgroundColor:'#2a2e39'},horzLine:{color:'#758696',style:3,labelBackgroundColor:'#2a2e39'}}});
     series=chart.addCandlestickSeries({upColor:'#26a69a',downColor:'#ef5350',wickUpColor:'#26a69a',wickDownColor:'#ef5350',borderVisible:false,
-      autoscaleInfoProvider:o=>{const r=o();if(!S.fit||!bookLo||!bookHi||!r||!r.priceRange)return r;return{priceRange:{minValue:Math.min(r.priceRange.minValue,bookLo),maxValue:Math.max(r.priceRange.maxValue,bookHi)},margins:r.margins}}});
+      autoscaleInfoProvider:o=>{let r=o();if(r&&r.priceRange&&BRKR&&BRKR.s===cur)r={priceRange:{minValue:Math.min(r.priceRange.minValue,BRKR.lo),maxValue:Math.max(r.priceRange.maxValue,BRKR.hi)},margins:r.margins};if(!S.fit||!bookLo||!bookHi||!r||!r.priceRange)return r;return{priceRange:{minValue:Math.min(r.priceRange.minValue,bookLo),maxValue:Math.max(r.priceRange.maxValue,bookHi)},margins:r.margins}}});
     vol=chart.addHistogramSeries({priceFormat:{type:'volume'},priceScaleId:'vol',lastValueVisible:false,priceLineVisible:false});
     chart.priceScale('vol').applyOptions({scaleMargins:{top:.82,bottom:0}});
     rebuildInd();
