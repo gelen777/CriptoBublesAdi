@@ -97,6 +97,7 @@ button{cursor:pointer}
 #blist .br:active{background:#161c28}
 #blist .br img{width:24px;height:24px;border-radius:50%;flex:none;background:#1a1f2b}
 .lgw{position:relative;width:24px;height:24px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;overflow:hidden}.lgw i{font-style:normal;font-weight:800;font-size:8.5px;color:#fff;letter-spacing:-.2px}#blist .lgw img{position:absolute;inset:0;width:100%;height:100%;opacity:0;background:transparent}.lgw.ok img{opacity:1}.lgw.ok{background:#1a1f2b!important}.lgw.ok i{display:none}
+#csz .h3{margin-top:14px}#csz .szh{font-size:11px;color:#8b93a7;margin:8px 0 4px}#csz .szp{font-size:12px;color:#ffd54f;font-weight:700;margin:8px 0;padding:4px 8px;border-left:3px solid #ffd54f;background:rgba(255,213,79,.06);border-radius:4px}#csz .szr{padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05)}#csz .szl{position:relative;display:flex;justify-content:space-between;gap:8px;padding:3px 8px 6px;border-left:3px solid;font-size:13px}#csz .szl i{position:absolute;left:8px;bottom:0;height:2px;border-radius:1px;max-width:calc(100% - 8px);opacity:.8}#csz small{display:block;color:#8b93a7;font-size:11px;padding:3px 8px 0 11px;line-height:1.35}#csz .szn{font-size:11px;color:#6c7488;padding:8px 2px;line-height:1.4}
 #blist .bkc{display:flex;gap:4px;align-items:center;padding:6px 8px 0;overflow-x:auto;scrollbar-width:none}#blist .bks{flex:1}#blist .bk{flex:none;background:#151a24;border:1px solid #232a3a;border-radius:9px;color:#aab2c5;font-size:11.5px;padding:5px 9px;white-space:nowrap}#blist .bk.on{background:#1f6f4f;border-color:#26a69a;color:#fff;font-weight:700}#blist .bkh{font-size:10.5px;color:#6c7488;padding:5px 10px}#blist .bkpr{height:3px;background:#1a1f2b;margin:6px 10px 0;border-radius:2px;overflow:hidden}#blist .bkpr i{display:block;height:100%;background:#26dc96;transition:width .3s}#blist .bkr small+small{color:#6c7488;font-size:10.5px}#blist .bkn{width:16px;flex:none;text-align:center;color:#6c7488;font-size:11px}#blist .bp b.bksc{display:inline-block;min-width:30px;text-align:center;border:1.5px solid;border-radius:14px;padding:1px 6px;font-size:14px;font-weight:800;margin-bottom:3px}#blist .bkr .bm small{white-space:normal}#blist .bkr .bp span{display:block;font-size:11px}#blist .bkr .bp{max-width:92px}
 #blist .bq{display:flex;justify-content:space-between;align-items:center;padding:4px 10px;font-size:11px;color:#8b93a7;background:rgba(255,213,79,.06)}#blist .bq button{background:transparent;border:1px solid #3a4256;border-radius:10px;color:#d6dae3;font-size:11px;padding:3px 9px}
 #blist .bm{flex:1;min-width:0}#blist .bm div{display:flex;align-items:center;gap:4px;white-space:nowrap;overflow:hidden}
@@ -234,7 +235,7 @@ select,input{outline:none}select:focus,input:focus{border-color:var(--ac)}
   <div id="bar">
     <div class="r1"><button id="back" aria-label="Назад">‹</button><div class="tt"><span id="ttl"></span><div class="sub"><span id="st">● нет связи</span><span id="dbg"></span></div></div><button id="fstar" class="fs" aria-label="В избранное">☆</button><button id="vw" class="tv">TW</button><button id="gear" aria-label="Настройки">⚙</button></div>
     <div class="r2"><div id="tfs"><button data-tf="1m">1м</button><button data-tf="5m">5м</button><button data-tf="15m">15м</button><button data-tf="1h">1ч</button><button data-tf="4h">4ч</button><button data-tf="1d">1д</button><button data-tf="1w">1н</button></div></div>
-    <div class="r3"><button id="ladb" class="tl" style="display:none"></button><button id="patb" class="tl">△ Фигуры</button><button id="drb" class="tl">✏ Рисовать</button><button id="indb" class="tl" style="display:none"></button></div>
+    <div class="r3"><button id="ladb" class="tl" style="display:none"></button><button id="szb" class="tl">🛑 Остановки</button><button id="patb" class="tl">△ Фигуры</button><button id="drb" class="tl">✏ Рисовать</button><button id="indb" class="tl" style="display:none"></button></div>
   </div>
   <div id="dbar"></div><div id="ipanel"></div>
   <div id="panel">
@@ -1160,17 +1161,17 @@ const CP=[['h1','1H',['1m',60]],['d1','1D',['15m',96]],['w1','1W',['1h',168]],['
 let CC=null,CCs={},CCp='h1',CCtab='ov',CCt=null;
 function openCoin(sym){
   const c=coins.get(sym);if(!c)return;
-  CC=c;CCs={};CCp='h1';CCtab='ov';$('#coin').style.display='block';renderCoin();
+  CC=c;CCs={};CCp='h1';CCtab='ov';szCoin(sym);$('#coin').style.display='block';renderCoin();
   clearInterval(CCt);CCt=setInterval(updCoin,700);
   CP.forEach(async([k,l,[iv,lim]])=>{try{const kk=await apiK(AS.mkt,sym,iv,lim);if(CC&&CC.s===sym){CCs[k]=kk.map(r=>+r[4]);CCs[k+'o']=+kk[0][1];updCoin()}}catch(e){}});
 }
-function closeCoin(){CC=null;clearInterval(CCt);$('#coin').style.display='none'}
-function renderCoin(){renderCoin0();fillCoinNews()}
+function closeCoin(){CC=null;CSZ.s='';clearInterval(CCt);$('#coin').style.display='none'}
+function renderCoin(){renderCoin0();fillCoinNews();CSZ.t=0;szCoinRender()}
 function fillCoinNews(){const el=$('#cnews');if(!el||!CC)return;const L=NEWS.filter(n=>n.syms.includes(CC.s)).slice(0,6);el.innerHTML=L.length?'<div class="h3">Новости по '+esc(CC.n)+'</div>'+L.map(newsRow).join(''):''}
 function renderCoin0(){
   const c=CC,ov=CCtab==='ov',row=(l,v)=>'<div class="drow"><span>'+l+'</span><b>'+v+'</b></div>';
   const body=ov?'<div class="nm">'+esc(c.nm||c.n)+' <small>'+esc(c.n)+'</small></div><div class="row2"><div><div id="cbig" class="big"></div><div id="cchg"></div></div><div class="acts"><button id="cchart">📈 График и заявки</button><button id="ctv">TradingView</button></div></div>'
-      +'<div id="cnews"></div><canvas id="cch"></canvas><div class="pt" id="cpt"></div>'
+      +'<div id="cnews"></div><canvas id="cch"></canvas><div class="pt" id="cpt"></div><div id="csz"></div>'
       +'<div class="conv"><label>'+esc(c.n)+'<input id="cv1" value="1" inputmode="decimal"></label><span>⇌</span><label>USD<input id="cv2" inputmode="decimal"></label></div><div class="h3">Списки</div><div class="chips" id="cl"></div>'
     :'<div id="cdt"></div>';
   $('#coin').innerHTML='<div class="ccH"><button id="cb">←</button><div class="ccT"><b>'+esc(c.n)+'</b><div id="ccp"></div></div><button id="cstar">★</button></div>'
@@ -1178,7 +1179,7 @@ function renderCoin0(){
   updCoin();
 }
 function updCoin(){
-  const c=CC;if(!c)return;
+  const c=CC;if(!c)return;szCoinRender();
   const d=c.o?(c.p/c.o-1)*100:0,up=d>=0,cl=up?'up':'dn',arr=up?'▲':'▼';
   setH($('#ccp'),fp(c.p)+' <span class="'+cl+'">'+arr+' '+fpc(Math.abs(d))+'</span>');
   $('#cstar').classList.toggle('on',LISTS.fav.includes(c.s));
@@ -1254,7 +1255,7 @@ window.cbHideAll=()=>{
   $('#bub').style.display='flex';
 };
 /* ---------- CHART + WALLS ---------- */
-let statT=null,stats={},candles=[],pollT=null,lastDepth=0,dbgT=0,prec=2,midP=0,vol,lastC,chart,series,cur=null,gen=0,sock=null,bids=new Map(),asks=new Map(),synced=false,list=[],lastCalc=0,prof=[],bookLo=0,bookHi=0,lastSide=0,lastScr=0,sideInit=false,CM='spot',sock2=null;
+let szT=0,statT=null,stats={},candles=[],pollT=null,lastDepth=0,dbgT=0,prec=2,midP=0,vol,lastC,chart,series,cur=null,gen=0,sock=null,bids=new Map(),asks=new Map(),synced=false,list=[],lastCalc=0,prof=[],bookLo=0,bookHi=0,lastSide=0,lastScr=0,sideInit=false,CM='spot',sock2=null;
 const seen=new Map();let fading=[];
 const ov=$('#ov'),ox=ov.getContext('2d');
 
@@ -1465,6 +1466,115 @@ function calcWalls(now){
   list=l;
 }
 const fmt=n=>'$'+(n>=1e6?(n/1e6).toFixed(2)+'M':n>=1e3?(n/1e3).toFixed(0)+'K':n.toFixed(0));
+/* ================= 🛑 ГДЕ ЦЕНА МОЖЕТ ОСТАНОВИТЬСЯ =================
+   Ищет зоны выше и ниже цены, где движение вероятнее всего затормозит или развернётся. Складывает:
+   🐋 стакан — где сидят крупные заявки (киты), живой стакан + глубокий снимок;
+   📊 профиль объёма — на каких ценах раньше прошли самые большие объёмы (1ч за ~6 недель + 4ч за ~3 мес.);
+   ↕ разворотные точки — где цена уже останавливалась (1ч и 4ч), свежие весят больше;
+   💥 свечи с аномальным объёмом — их максимумы/минимумы/закрытия;
+   📅 максимум/минимум вчерашнего дня и прошлой недели, 🔘 круглые цены. */
+const SZH=new Map();
+async function szHist(mk,sym){
+  const key=mk+sym,o=SZH.get(key);if(o&&Date.now()-o.t<300000)return o;
+  const map=k=>(k||[]).map(r=>({t:r[0]/1000,o:+r[1],h:+r[2],l:+r[3],c:+r[4],q:+r[7]||(+r[5])*(+r[4])}));
+  const [a,b]=await Promise.all([apiK(mk,sym,'1h',1000),apiK(mk,sym,'4h',600).catch(()=>[])]);
+  const r={t:Date.now(),h1:map(a),h4:map(b)};SZH.set(key,r);if(SZH.size>25)SZH.delete(SZH.keys().next().value);return r;
+}
+const bookArr=m=>{const o=[];m.forEach((q,p)=>{p=+p;o.push([p,p*q])});return o};
+function szCalc(H,price,B,A){
+  const h1=H.h1,h4=H.h4;if(!h1||h1.length<60||!(price>0))return [];
+  const atr=atrN(h1,48)||price*.005,step=Math.max(price*.0012,atr*.22),span=Math.max(price*.1,atr*25),lo=price-span,N=Math.ceil(2*span/step);
+  const ix=p=>Math.floor((p-lo)/step),Z=()=>new Float64Array(N),bk=Z(),vp=Z(),sw=Z(),an=Z(),ms=Z(),bkB=Z(),bkA=Z(),swN=Z(),anN=Z(),ML=[];
+  const put=(a,p,v)=>{const i=ix(p);if(i>=0&&i<N)a[i]+=v};
+  /* 🐋 стакан: заявки выше цены — продавцы, ниже — покупатели */
+  B.forEach(([p,u])=>{if(p<=price){put(bk,p,u);put(bkB,p,u)}});A.forEach(([p,u])=>{if(p>=price){put(bk,p,u);put(bkA,p,u)}});
+  /* 📊 профиль объёма */
+  const prof=(c,w)=>c.forEach(x=>{const a=Math.max(lo,x.l),b=Math.min(lo+span*2,x.h);if(b<a)return;const i0=Math.max(0,ix(a)),i1=Math.min(N-1,ix(b)),v=x.q*w/(i1-i0+1);for(let i=i0;i<=i1;i++)vp[i]+=v});
+  prof(h1,1);if(h4.length)prof(h4.filter(x=>x.t<h1[0].t),.6);
+  /* ↕ развороты */
+  const sws=(c,k,w)=>{if(c.length<20)return;const P=pivots(c,k,0),m=c.length;P.H.concat(P.L).forEach(q=>{put(sw,q.p,w*(.35+.65*q.i/m));put(swN,q.p,1)})};
+  sws(h1,4,1);sws(h4,3,1.7);
+  /* 💥 аномальный объём */
+  for(let i=50;i<h1.length;i++){let s=0;for(let j=i-50;j<i;j++)s+=h1[j].q;const m=s/50,x=h1[i];if(m&&x.q>3*m){const w=Math.min(4,x.q/m)*(.4+.6*i/h1.length);put(an,x.h,w);put(an,x.l,w);put(an,x.c,w*.7);put(anN,x.c,1)}}
+  /* 📅 вчера / прошлая неделя, 🔘 круглые числа */
+  const day=86400,nowD=Math.floor(Date.now()/1000/day),hl=(f,t)=>{let H0=-Infinity,L0=Infinity;h1.forEach(x=>{if(x.t>=f&&x.t<t){H0=Math.max(H0,x.h);L0=Math.min(L0,x.l)}});return H0>0?[H0,L0]:null};
+  const pd=hl((nowD-1)*day,nowD*day),wk=Math.floor((nowD+3)/7),pw=hl((wk-1)*7*day-3*day,wk*7*day-3*day);
+  if(pd){put(ms,pd[0],1);put(ms,pd[1],1);ML.push([pd[0],'макс. вчера'],[pd[1],'мин. вчера'])}
+  if(pw){put(ms,pw[0],1.3);put(ms,pw[1],1.3);ML.push([pw[0],'макс. прошлой недели'],[pw[1],'мин. прошлой недели'])}
+  const mg=Math.pow(10,Math.floor(Math.log10(price)));[[mg,1.2],[mg/2,.8],[mg/10,.4]].forEach(([u,w])=>{if(2*span/u>40)return;for(let v=Math.ceil(lo/u)*u;v<lo+2*span;v+=u){put(ms,v,w);if(w>=.8)ML.push([v,'круглая цена'])}});
+  /* нормируем каждый источник и складываем */
+  const nz=a=>{const v=[];for(let i=0;i<N;i++)if(a[i]>0)v.push(a[i]);if(!v.length)return a;v.sort((x,y)=>x-y);const q=v[Math.floor(v.length*.96)]||v[v.length-1];const o=Z();for(let i=0;i<N;i++)o[i]=Math.min(1.6,a[i]/q);return o};
+  const sm=a=>{const o=Z();for(let i=0;i<N;i++)o[i]=a[i]*.5+(a[i-1]||0)*.25+(a[i+1]||0)*.25;return o};
+  const nb=nz(bk),nv=nz(sm(vp)),ns=nz(sm(sw)),na=nz(an),nm=nz(ms),T=Z();
+  for(let i=0;i<N;i++)T[i]=.36*nb[i]+.27*nv[i]+.2*ns[i]+.1*na[i]+.07*nm[i];
+  const TS=sm(T),ip=ix(price);let mx=0;for(let i=0;i<N;i++)mx=Math.max(mx,TS[i]);if(!mx)return [];
+  /* зоны: локальные максимумы, расширяем, пока сила > 60% пика */
+  const pk=[];for(let i=1;i<N-1;i++)if(TS[i]>=TS[i-1]&&TS[i]>TS[i+1]&&TS[i]>.2*mx&&Math.abs(i-ip)>=1)pk.push(i);
+  const used=new Uint8Array(N),out=[];
+  pk.sort((a,b)=>TS[b]-TS[a]).forEach(i=>{if(used[i])return;let a=i,b=i;
+    while(a>0&&a>i-3&&TS[a-1]>TS[i]*.68&&!used[a-1]&&a-1!==ip)a--;while(b<N-1&&b<i+3&&TS[b+1]>TS[i]*.68&&!used[b+1]&&b+1!==ip)b++;
+    for(let j=a;j<=b;j++)used[j]=1;
+    const zlo=lo+a*step,zhi=lo+(b+1)*step,up=zlo>price,sum=(x)=>{let s=0;for(let j=a;j<=b;j++)s+=x[j];return s},mxv=x=>{let s=0;for(let j=a;j<=b;j++)s=Math.max(s,x[j]);return s};
+    const whale=up?sum(bkA):sum(bkB),tags=[];
+    if(mxv(nb)>=.8)tags.push('🐋 '+(up?'продажи ':'покупки ')+fmtM(whale,1));
+    if(mxv(nv)>=.7)tags.push('📊 большой объём в прошлом');
+    const tc=sum(swN);if(tc>=2)tags.push('↕ разворачивалась '+tc+' р.');
+    if(mxv(na)>=.5)tags.push('💥 аномальный объём');
+    const ml=[...new Set(ML.filter(x=>x[0]>=zlo-step*.5&&x[0]<=zhi+step*.5).map(x=>x[1]))];ml.forEach(t=>tags.push((t==='круглая цена'?'🔘 ':'📅 ')+t));
+    const sc=Math.round(Math.min(100,(TS[i]/mx)*65+Math.min(1,TS[i]/.6)*35));
+    out.push({lo:zlo,hi:zhi,mid:(zlo+zhi)/2,up,sc,whale,tags,d:((up?zlo:zhi)/price-1)*100});
+  });
+  const pick=up=>out.filter(z=>z.up===up&&z.tags.length&&z.sc>=30).sort((a,b)=>Math.abs(a.d)-Math.abs(b.d)).slice(0,6).sort((a,b)=>b.sc-a.sc).slice(0,4).sort((a,b)=>Math.abs(a.d)-Math.abs(b.d));
+  return pick(true).concat(pick(false));
+}
+/* ---------- на графике ---------- */
+let SZD={key:'',H:null,deep:null,dt:0,z:[],t:0,busy:0};
+function szUpd(){
+  const key=CM+cur;if(SZD.key!==key){SZD={key,H:null,deep:null,dt:0,z:[],t:0,busy:0}}
+  const D=SZD;if(!D.H&&!D.busy){D.busy=1;szHist(CM,cur).then(H=>{if(SZD===D)D.H=H}).catch(()=>{}).finally(()=>D.busy=0)}
+  if(Date.now()-D.dt>30000){D.dt=Date.now();apiD(CM,cur,CM==='fut'?1000:5000).then(d=>{if(SZD===D)D.deep=d}).catch(()=>{})}
+  if(!D.H)return;
+  const price=lastC?lastC.close:midP;if(!price)return;
+  /* живой стакан точнее у цены, глубокий снимок — дальше от неё */
+  let B=bookArr(bids),A=bookArr(asks);
+  if(D.deep){const bl=B.length?Math.min(...B.map(x=>x[0])):Infinity,ah=A.length?Math.max(...A.map(x=>x[0])):0;
+    (D.deep.bids||[]).forEach(([p,q])=>{p=+p;if(p<bl)B.push([p,p*q])});(D.deep.asks||[]).forEach(([p,q])=>{p=+p;if(p>ah)A.push([p,p*q])})}
+  try{D.z=szCalc(D.H,price,B,A);D.t=Date.now()}catch(e){}
+}
+function drawSZ(w,h,right){
+  const Z0=SZD.key===CM+cur?SZD.z:[],Z=[true,false].flatMap(u=>Z0.filter(z=>z.up===u&&z.sc>=45).slice(0,3));if(!Z.length)return;const placed=[];
+  ox.save();ox.font='600 10.5px system-ui';ox.textBaseline='middle';ox.textAlign='left';
+  Z.forEach(z=>{const y1=series.priceToCoordinate(z.hi),y2=series.priceToCoordinate(z.lo);if(y1==null||y2==null)return;
+    const top=Math.min(y1,y2),bh=Math.max(3,Math.abs(y2-y1));if(top>h||top+bh<0)return;
+    const col=z.up?'255,112,67':'38,198,140',a=.08+.2*z.sc/100;
+    ox.fillStyle=`rgba(${col},${a})`;ox.fillRect(0,top,right,bh);
+    ox.setLineDash([5,4]);ox.strokeStyle=`rgba(${col},${.35+.5*z.sc/100})`;ox.lineWidth=z.sc>=70?1.6:1;ox.beginPath();ox.moveTo(0,top);ox.lineTo(right,top);ox.moveTo(0,top+bh);ox.lineTo(right,top+bh);ox.stroke();ox.setLineDash([]);
+    const t='🛑 '+(z.up?'сопротивление':'поддержка')+' · сила '+z.sc+' · '+(z.d>=0?'+':'')+cm(z.d.toFixed(2))+'%'+(z.tags[0]?' · '+z.tags[0]:''),tw=Math.min(right-16,ox.measureText(t).width+10);
+    let ly=top+bh/2;for(const dy of [0,16,-16,32,-32]){const q=ly+dy;if(placed.every(p=>Math.abs(p-q)>=15)){ly=q;break}}placed.push(ly);
+    if(ly<8||ly>h-8)return;
+    ox.fillStyle=`rgba(${col},.85)`;ox.beginPath();ox.roundRect?ox.roundRect(6,ly-8,tw,16,4):ox.rect(6,ly-8,tw,16);ox.fill();
+    ox.fillStyle='#fff';ox.fillText(t,11,ly,tw-8)});
+  ox.restore();
+}
+/* ---------- в карточке монеты ---------- */
+let CSZ={s:'',H:null,dp:null,t:0,dt:0,tm:0};
+function szCoin(sym){CSZ={s:sym,H:null,dp:null,t:0,dt:0,tm:0};const mk=AS.mkt;
+  szHist(mk,sym).then(H=>{if(CSZ.s===sym){CSZ.H=H;szCoinRender()}}).catch(()=>{const e=$('#csz');if(e&&CSZ.s===sym)e.innerHTML='<div class="h3">🛑 Где цена может остановиться</div><div class="szn">Нет связи с Binance</div>'})}
+function szCoinRender(){
+  const e=$('#csz');if(!e||!CC||CC.s!==CSZ.s)return;
+  if(Date.now()-CSZ.dt>15000){CSZ.dt=Date.now();const s=CSZ.s;apiD(AS.mkt,s,AS.mkt==='fut'?1000:5000).then(d=>{if(CSZ.s===s){CSZ.dp=d;CSZ.t=0;szCoinRender()}}).catch(()=>{})}
+  if(!CSZ.H){e.innerHTML='<div class="h3">🛑 Где цена может остановиться</div><div class="szn">⏳ Анализирую стакан и объёмы…</div>';return}
+  if(Date.now()-CSZ.t<2500)return;CSZ.t=Date.now();
+  const d=CSZ.dp||{bids:[],asks:[]},B=(d.bids||[]).map(([p,q])=>[+p,+p*q]),A=(d.asks||[]).map(([p,q])=>[+p,+p*q]);
+  const Z=szCalc(CSZ.H,CC.p,B,A),row=z=>'<div class="szr" data-p="'+z.mid+'"><div class="szl" style="border-color:'+(z.up?'#ff7043':'#26c68c')+'"><b>'+fPr(z.lo)+' – '+fPr(z.hi)+'</b><span style="color:'+(z.up?'#ff8a65':'#4dd9a3')+'">'+(z.d>=0?'+':'')+cm(z.d.toFixed(2))+'%</span><i style="width:'+z.sc+'%;background:'+(z.up?'#ff7043':'#26c68c')+'"></i></div><small>'+z.tags.map(esc).join(' · ')+'</small></div>';
+  const up=Z.filter(z=>z.up).reverse(),dn=Z.filter(z=>!z.up);
+  e.innerHTML='<div class="h3">🛑 Где цена может остановиться</div>'
+    +(up.length?'<div class="szh">▲ При росте (сопротивления)</div>'+up.map(row).join(''):'')
+    +'<div class="szp">● Сейчас '+fPr(CC.p)+'</div>'
+    +(dn.length?'<div class="szh">▼ При падении (поддержки)</div>'+dn.map(row).join(''):'')
+    +(Z.length?'':'<div class="szn">Сильных зон рядом не найдено</div>')
+    +'<div class="szn">Сила зоны (полоска) = крупные заявки китов в стакане + объёмы, прошедшие на этих ценах раньше + прошлые развороты + аномальные свечи + вчерашние/недельные максимумы и минимумы. Стакан обновляется каждые 15 сек. Нажмите на «📈 График и заявки» — зоны будут нарисованы на графике.</div>';
+}
 /* ---------- авто-фигуры теханализа ---------- */
 let PATS=[],patT=0,PSRC=null,PC=null,pcT=0,pcKey='';
 const patTf=()=>{const t=S.ptf||'4h';return t==='chart'?S.tf:t};
@@ -1639,6 +1749,7 @@ function draw0(){
         const y1=series.priceToCoordinate(w.p+w.step/2),y2=series.priceToCoordinate(w.p-w.step/2),hh=Math.max(1.5,Math.abs((y2??y)-(y1??y))-.5),len=Math.max(2,ml*Math.pow(w.usd/mu,.55));
         ox.fillStyle=w.side==='b'?'rgba(38,166,154,.30)':'rgba(239,83,80,.30)';ox.fillRect(right-len,y-hh/2,len,hh)})}
   }
+  if(S.sz!==false){if(now-szT>1000){szT=now;szUpd()}drawSZ(w,h,right)}
   fading.forEach(f=>paint(f,1-(now-f.t)/1400,0));
   list.forEach(wl=>{const age=now-(seen.get(wl.key)||0);paint(wl,1,age<800?1-age/800:0)});
   const placed=[];ox.font='600 11px system-ui';ox.textAlign='left';ox.textBaseline='middle';
@@ -1937,7 +2048,7 @@ function loadS(sym){
 function syncUI(){
   $('#pn').textContent='Настройки: '+cur.replace('USDT','/USDT');
   $('#minUsd').value=S.minUsd||'';$('#bucket').value=S.bucket;$('#range').value=S.range;
-  $('#hist').value=S.hist||'month';$('#ptf').value=S.ptf||'4h';['pt','ptl','ptr','pfl','pac','pcu','pdb'].forEach(k=>{$('#'+k).checked=S[k]!==false});$('#patb').classList.toggle('on',S.pt!==false);
+  $('#hist').value=S.hist||'month';$('#ptf').value=S.ptf||'4h';['pt','ptl','ptr','pfl','pac','pcu','pdb'].forEach(k=>{$('#'+k).checked=S[k]!==false});$('#patb').classList.toggle('on',S.pt!==false);$('#szb').classList.toggle('on',S.sz!==false);
   $('#sb').checked=S.bids;$('#sa').checked=S.asks;$('#topn').value=S.top;$('#sprof').checked=S.prof;$('#sfit').checked=S.fit;$('#slad').checked=S.lad;$('#stb').checked=S.tbl;$('#tper').value=S.tper;$('#tnat').checked=S.tnat;$('#tnl').value=S.tnl;$('#tsz').value=S.tsz;markTf();
 }
 /* ---------- UI ---------- */
@@ -1957,6 +2068,7 @@ st.addEventListener('pointermove',e=>{if(!drag)return;const m=$('#main').getBoun
 st.addEventListener('pointerup',()=>{if(drag){drag=null;save()}});}
 $('#tpos').onclick=()=>{S.tpos=null;save();renderStat()};
 $('#rst').onclick=()=>{S=Object.assign({},DEF,{view:S.view});save();syncUI();applySide();lastCalc=0;list=[];seen.clear();fading=[];if(chart)load();if(S.view==='tv')showTV()};
+$('#szb').onclick=()=>{S.sz=S.sz===false;save();syncUI();szT=0;if(S.sz)toast('🛑 Зоны, где цена может остановиться: красные — выше цены, зелёные — ниже')};
 $('#patb').onclick=()=>{S.pt=!(S.pt!==false);save();syncUI();patT=0};
 $('#ladb').onclick=()=>{S.lad=!S.lad;save();syncUI();applySide();lastSide=0;lastCalc=0};
 $('#pclose').onclick=()=>{$('#panel').style.display='none'};
