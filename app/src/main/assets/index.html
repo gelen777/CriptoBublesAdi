@@ -347,7 +347,9 @@ async function viaWsF(path){
 async function bj(path){
   if(!useWs){
     for(let i=0;i<HOSTS.length;i++){const h=(hi+i)%HOSTS.length;
-      try{const c=new AbortController(),t=setTimeout(()=>c.abort(),5000);const r=await fetch(HOSTS[h][0]+path,{signal:c.signal});clearTimeout(t);if(r.ok){hi=h;return await r.json()}}catch(e){}}
+      let r=null;try{const c=new AbortController(),t=setTimeout(()=>c.abort(),5000);r=await fetch(HOSTS[h][0]+path,{signal:c.signal});clearTimeout(t)}catch(e){r=null}
+      if(r&&r.ok){hi=h;return await r.json()}
+      if(r&&r.status>=400&&r.status<500&&r.status!==403&&r.status!==418&&r.status!==429){hi=h;throw new Error('http '+r.status)}}
     useWs=true;
   }
   try{return await viaWs(path)}catch(e){throw new Error('net')}
@@ -527,6 +529,7 @@ const PMS={m1:6e4,m5:3e5,m15:9e5,h1:36e5};
 setInterval(()=>{const t=Date.now();coins.forEach(c=>{const h=c.hs||(c.hs=[]);h.push([t,c.p]);if(h.length>130)h.shift()})},30000);
 const chg=(c,cf)=>{
   if(cf.per==='d1')return c.o?(c.p/c.o-1)*100:0;
+  if(cf.per==='h1'||cf.per==='h4'){const v=rwPct(c,cf.per==='h1'?'1h':'4h');if(v!=null)return v}
   if(c.bp===cf.per&&c.base)return (c.p/c.base-1)*100;
   const ms=PMS[cf.per],h=c.hs,t=Date.now();
   if(ms&&h&&h.length&&t-h[0][0]>=ms*.9){let b=h[0][1];for(const x of h)if(t-x[0]<=ms){b=x[1];break}return b?(c.p/b-1)*100:0}
@@ -546,23 +549,55 @@ function visible(){
   for(let i=n;i<v.length;i++)if(isNew(v[i])||NSIG[v[i].s])t.push(v[i]);
   return t;
 }
-async function ensureBase(){
-  const cf=cfg(),P=PER[cf.per];if(!P.b)return;
-  const my=++baseTok,mk0=AS.mkt,now=Date.now(),[iv,lim]=P.b;let need=VIS.filter(c=>(c.bp!==cf.per||(P.live&&now-c.bt>60000))&&!(c.kf&&now-c.kf<6e5));
-  /* спот: изменение за скользящее окно (ровно последний час / 4 часа / 7 дней) одним запросом на 100 монет */
-  const WS={m1:'1m',m5:'5m',m15:'15m',h1:'1h',h4:'4h',w1:'7d'}[cf.per];
-  if(mk0==='spot'&&WS&&need.length){
-    for(let i=0;i<need.length;i+=100){if(my!==baseTok)return;const part=need.slice(i,i+100);
-      try{const r=await bj('/api/v3/ticker?symbols='+encodeURIComponent(JSON.stringify(part.map(c=>c.s)))+'&windowSize='+WS);const m=new Map((r||[]).map(x=>[x.symbol,x]));
-        part.forEach(c=>{const x=m.get(c.s);if(x&&+x.openPrice){c.base=+x.openPrice;c.bp=cf.per;c.bt=Date.now();c.kf=0}})}catch(e){}}
-    need=need.filter(c=>c.bp!==cf.per);
-  }
-  for(let i=0;i<need.length;i+=20){
-    if(my!==baseTok)return;
-    await Promise.all(need.slice(i,i+20).map(async c=>{try{const k=await apiK(mk0,c.s,iv,lim);if(k.length){c.base=+k[0][1];c.bp=cf.per;c.bt=Date.now();c.kf=0}}catch(e){c.kf=Date.now()}}));
-  }
+/* ---- данные для периодов пузырей (5м…1Г) ----
+   1) скользящие окна спота 1ч/4ч/1д — один поток WebSocket на ВСЕ монеты сразу (обновляется каждую секунду);
+   2) окно 7 дней и запасной вариант — пакетный запрос /ticker (100 монет за раз; фьючерсы берут % у спот-пары);
+   3) что не нашлось — свечи по каждой монете (не больше 8 запросов одновременно, повтор через 1,5 мин). */
+const RW={};let rwSock=null,rwWin='',rwT=0;
+function rwStream(win){
+  if(rwWin===win&&rwSock&&rwSock.readyState<2)return;
+  try{rwSock&&rwSock.close()}catch(e){}rwWin=win;let hi2=0;
+  const urls=['wss://stream.binance.com:9443/ws/!ticker_'+win+'@arr','wss://data-stream.binance.vision/ws/!ticker_'+win+'@arr','wss://stream.binance.com:443/ws/!ticker_'+win+'@arr'];
+  const open=()=>{if(rwWin!==win)return;let w;try{w=new WebSocket(urls[hi2%urls.length])}catch(e){return}rwSock=w;let got=0;
+    w.onmessage=e=>{got=1;const m=RW[win]||(RW[win]=new Map()),t=Date.now();try{JSON.parse(e.data).forEach(x=>m.set(x.s,[+x.o,+x.c,t]))}catch(_){}rwT=t};
+    w.onclose=()=>{if(rwWin!==win)return;if(!got)hi2++;setTimeout(open,got?1500:3000)}};
+  open();
 }
-function updHint(){if(!coins.size)return;const t='Binance '+(AS.mkt==='fut'?'Фьючерсы':'Спот')+' · '+PER[cfg().per].l+' · '+VIS.length+' монет'+(AS.sort!=='all'?' · список':''),h=$('#hint');if(h.textContent!==t)h.textContent=t}
+/* % изменения монеты по спот-окну (для фьючерсов — по спот-паре того же актива, если цены совпадают) */
+function rwPct(c,win){const m=RW[win];if(!m)return null;const [ss,f]=AS.mkt==='fut'?FSP(c.s):[c.s,1],x=m.get(ss);if(!x||!x[0]||Date.now()-x[2]>120000)return null;
+  if(AS.mkt==='fut'&&c.p&&Math.abs(x[1]*f/c.p-1)>.03)return null;return (x[1]/x[0]-1)*100}
+async function rollBatch(syms,ws){ /* пакет с делением пополам, если какой-то символ не принят */
+  if(!syms.length)return [];
+  try{return await bj('/api/v3/ticker?symbols='+encodeURIComponent(JSON.stringify(syms))+'&windowSize='+ws)||[]}
+  catch(e){if(syms.length<=3)return [];const h=syms.length>>1;return (await rollBatch(syms.slice(0,h),ws)).concat(await rollBatch(syms.slice(h),ws))}}
+let baseRun=null,baseErr=0;const BST={per:'',ok:0,tot:0};
+async function ensureBase(){
+  const cf=cfg(),P=PER[cf.per];const RWW={h1:'1h',h4:'4h'}[cf.per];if(RWW)rwStream(RWW);
+  if(!P.b)return;
+  const key=AS.mkt+cf.per;if(baseRun===key)return;   /* не перезапускаем, пока идёт загрузка того же периода */
+  baseRun=key;const my=++baseTok,mk0=AS.mkt,now=Date.now(),[iv,lim]=P.b;
+  try{
+    let need=VIS.filter(c=>(c.bp!==cf.per||(P.live&&now-c.bt>60000))&&!(c.kf&&now-c.kf<9e4));
+    BST.per=cf.per;BST.tot=VIS.length;
+    /* пакетные скользящие окна (спот и фьючерсы через спот-пару) */
+    const WS={m1:'1m',m5:'5m',m15:'15m',h1:'1h',h4:'4h',w1:'7d'}[cf.per];
+    if(WS&&need.length){
+      const map=new Map();need.forEach(c=>{const [ss,f]=mk0==='fut'?FSP(c.s):[c.s,1];map.set(c,[ss,f])});
+      const syms=[...new Set([...map.values()].map(x=>x[0]))];
+      for(let i=0;i<syms.length;i+=100){if(my!==baseTok)return;
+        const r=await rollBatch(syms.slice(i,i+100),WS),m=new Map(r.map(x=>[x.symbol,x]));
+        need.forEach(c=>{const [ss,f]=map.get(c),x=m.get(ss);if(!x||!+x.openPrice)return;
+          if(mk0==='fut'&&c.p&&Math.abs(+x.lastPrice*f/c.p-1)>.03)return;        /* спот-пара — другая монета */
+          c.base=c.p/(+x.lastPrice/+x.openPrice);c.bp=cf.per;c.bt=Date.now();c.kf=0})}
+      need=need.filter(c=>c.bp!==cf.per||(P.live&&Date.now()-c.bt>60000));
+    }
+    /* свечи по одной монете — для остальных */
+    let idx=0;const work=async()=>{while(idx<need.length&&my===baseTok){const c=need[idx++];
+      try{const k=await apiK(mk0,c.s,iv,lim);if(k&&k.length){c.base=+k[0][1];c.bp=cf.per;c.bt=Date.now();c.kf=0}else c.kf=Date.now()}catch(e){c.kf=Date.now();baseErr++}}};
+    await Promise.all(Array.from({length:8},work));
+  }finally{if(baseRun===key)baseRun=null;BST.ok=VIS.filter(c=>c.bp===cf.per||(RWW&&rwPct(c,RWW)!=null)).length;updHint()}
+}
+function updHint(){if(!coins.size)return;const cp=cfg().per,ld=PER[cp].b&&BST.per===cp&&BST.ok<VIS.length*.9?' · загружено '+BST.ok+'/'+VIS.length:'';const t='Binance '+(AS.mkt==='fut'?'Фьючерсы':'Спот')+' · '+PER[cp].l+' · '+VIS.length+' монет'+ld+(AS.sort!=='all'?' · список':''),h=$('#hint');if(h.textContent!==t)h.textContent=t}
 function applyCfg(noPanel){
   saveAll();document.body.classList.toggle('th2',AS.theme===2);
   VIS=visible();visT=performance.now();
@@ -1190,13 +1225,14 @@ $('#lst').onclick=e=>{if(e.target.closest('#lx')){$('#lst').style.display='none'
 $('#lst').oninput=e=>{if(e.target.id==='lq')renderLst()};
 
 /* карточка монеты */
-const CP=[['h1','1H',['1m',60]],['d1','1D',['15m',96]],['w1','1W',['1h',168]],['mo1','1M',['4h',180]],['y1','1Y',['1d',365]]];
+const CP=[['h1','1H',['1m',60]],['h4','4H',['5m',48]],['d1','1D',['15m',96]],['w1','1W',['1h',168]],['mo1','1M',['4h',180]],['y1','1Y',['1d',365]]];
 let CC=null,CCs={},CCp='h1',CCtab='ov',CCt=null;
 function openCoin(sym){
   const c=coins.get(sym);if(!c)return;
   CC=c;CCs={};CCp='h1';CCtab='ov';szCoin(sym);$('#coin').style.display='block';renderCoin();
   clearInterval(CCt);CCt=setInterval(updCoin,700);
-  CP.forEach(async([k,l,[iv,lim]])=>{try{const kk=await apiK(AS.mkt,sym,iv,lim);if(CC&&CC.s===sym){CCs[k]=kk.map(r=>+r[4]);CCs[k+'o']=+kk[0][1];updCoin()}}catch(e){}});
+  /* каждый период грузим с повторами (сеть может ответить не с первого раза) */
+  CP.forEach(async([k,l,[iv,lim]])=>{for(let a=0;a<4;a++){if(!CC||CC.s!==sym)return;try{const kk=await apiK(AS.mkt,sym,iv,lim);if(kk&&kk.length){if(CC&&CC.s===sym){CCs[k]=kk.map(r=>+r[4]);CCs[k+'o']=+kk[0][1];updCoin()}return}}catch(e){}await new Promise(r=>setTimeout(r,1500*(a+1)))}});
 }
 function closeCoin(){CC=null;CSZ.s='';clearInterval(CCt);$('#coin').style.display='none'}
 function renderCoin(){renderCoin0();fillCoinNews();CSZ.t=0;szCoinRender()}
