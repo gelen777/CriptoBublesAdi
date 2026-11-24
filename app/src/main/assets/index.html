@@ -222,7 +222,10 @@ select,input{outline:none}select:focus,input:focus{border-color:var(--ac)}
 #blist .bh button.on,#blst.on{background:var(--cd2)}
 #blist .br{border-bottom-color:#141923}#blist .br:active{background:var(--cd)}
 #news .nr,#cnews .nr{border-bottom-color:var(--ln)}
-.row button{white-space:nowrap}.row>span:last-child{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.row button{white-space:nowrap}.row>span:first-child{flex:1;min-width:0}.row>span:last-child{display:flex;gap:6px;flex-wrap:nowrap;justify-content:flex-end;flex:none}.row .chip{padding:7px 13px;font-size:14px}
+.ccH .chip{font-size:13px;padding:6px 12px}
+.big{font-size:clamp(24px,8.5vw,36px);white-space:nowrap}.row2>div:first-child{min-width:0;flex:1}.acts{flex:none}.acts button{font-size:13px;padding:8px 10px;white-space:nowrap}
+.conv label{min-width:0}.conv input{min-width:0;font-size:16px}
 #logo svg{filter:drop-shadow(0 2px 6px rgba(59,130,246,.35))}
 </style></head><body>
 <div id="bub">
@@ -1332,7 +1335,7 @@ const ov=$('#ov'),ox=ov.getContext('2d');
 function setStatus(on){const s=$('#st');s.textContent=on?'● онлайн':'● нет связи';s.className=on?'on':''}
 function closeSock(){clearInterval(pollT);clearInterval(statT);if(sock){sock.onclose=null;sock.onmessage=null;try{sock.close()}catch(e){}sock=null}if(sock2){sock2.onclose=null;sock2.onmessage=null;try{sock2.close()}catch(e){}sock2=null}setStatus(false)}
 
-const TFL={'1m':'1м','5m':'5м','15m':'15м','1h':'1Ч','4h':'4Ч','1d':'1Д','1w':'1Н'};
+const TFL={'1m':'1м','5m':'5м','15m':'15м','1h':'1Ч','4h':'4Ч','1d':'1Д','1w':'1Нед'};
 function markTf(){document.querySelectorAll('#tfs button').forEach(b=>b.classList.toggle('on',b.dataset.tf===S.tf))}
 function legend(p){if(!lastC&&!(p&&p.seriesData&&p.seriesData.get(series)))return;legend0(p);try{$('#lg').insertAdjacentHTML('beforeend',indLeg(p))}catch(e){}}
 function legend0(p){
@@ -1384,7 +1387,7 @@ async function load(){
   series.applyOptions({priceFormat:{type:'price',precision:p,minMove:1/10**p}});
   prec=p;candles=k.map(r=>({t:r[0]/1000,o:+r[1],h:+r[2],l:+r[3],c:+r[4],v:+r[5]}));{const q=k[k.length-1];lastC={time:q[0]/1000,open:+q[1],high:+q[2],low:+q[3],close:+q[4]}}vol.setData(k.map(r=>({time:r[0]/1000,value:+r[5],color:+r[4]>=+r[1]?'rgba(38,166,154,.5)':'rgba(239,83,80,.5)'})));legend();series.setData(k.map(r=>({time:r[0]/1000,open:+r[1],high:+r[2],low:+r[3],close:+r[4]})));
   loadDR();indDirty=1;
-  {const t1=candles[candles.length-1].t;try{chart.applyOptions({timeScale:{minBarSpacing:0.05}});chart.timeScale().setVisibleRange({from:Math.max(candles[0].t,t1-HD*86400),to:t1})}catch(e){chart.timeScale().scrollToRealTime()}}
+  {const t1=candles[candles.length-1].t;try{chart.applyOptions({timeScale:{minBarSpacing:0.05}});chart.timeScale().setVisibleRange({from:Math.max(candles[0].t,t1-Math.max(HD*86400,TS*60)),to:t1})}catch(e){chart.timeScale().scrollToRealTime()}}
   const keep=()=>{if(my!==gen||candles.length<2)return;KC.delete(ck);KC.set(ck,candles.map(x=>[x.t*1000,x.o,x.h,x.l,x.c,x.v]));while(KC.size>16)KC.delete(KC.keys().next().value)};
   if(fromCache)(async()=>{try{
     const fr=await kHist(CM,sym,tf,1000,0,()=>my===gen);if(my!==gen||!fr.length)return;
@@ -1402,7 +1405,7 @@ async function load(){
     series.setData(candles.map(x=>({time:x.t,open:x.o,high:x.h,low:x.l,close:x.c})));
     vol.setData(candles.map(x=>({time:x.t,value:x.v||0,color:x.c>=x.o?'rgba(38,166,154,.5)':'rgba(239,83,80,.5)'})));
     indDirty=1;patT=0;keep();
-    const t1=candles[candles.length-1].t;try{chart.timeScale().setVisibleRange({from:Math.max(candles[0].t,t1-HD*86400),to:t1})}catch(e){}
+    const t1=candles[candles.length-1].t;try{chart.timeScale().setVisibleRange({from:Math.max(candles[0].t,t1-Math.max(HD*86400,TS*60)),to:t1})}catch(e){}
   }catch(e){}})();
   let buf=[];lastDepth=0;startStats(sym,my);
   let got=false;const fut=CM==='fut';
@@ -1463,7 +1466,7 @@ function startStats(sym,my){
     const ws=[...new Set(parseRows(S.tper).map(r=>r.w))];
     quickStats(ws);
     if(CM==='fut'){await futStats(sym,my,ws);return}
-    try{await Promise.all(ws.map(async w=>{const d=await bj(`/api/v3/ticker?symbol=${sym}&windowSize=${w}`);if(my===gen)stats[w]={v:+d.quoteVolume,ch:+d.priceChangePercent}}))}catch(e){}
+    try{await Promise.all(ws.map(async w=>{const d=await bj(`/api/v3/ticker?symbol=${sym}&windowSize=${w}`);if(my===gen&&isFinite(+d.quoteVolume)&&d.quoteVolume!=null)stats[w]={v:+d.quoteVolume,ch:+d.priceChangePercent}}))}catch(e){}
   };
   go();statT=setInterval(go,3000);
 }
@@ -1600,7 +1603,7 @@ function szCalc(H,price,B,A,md){md=md||0;
   return pick(true).concat(pick(false));
 }
 /* настройки остановок (общие для всех монет) */
-const SZC=Object.assign({dist:0,sc:45,n:3,whale:0,up:true,dn:true},LS.get('cbSZ',{}));
+const SZC=Object.assign({dist:0,sc:45,n:2,whale:0,up:true,dn:true},LS.get('cbSZ',{}));
 const WSTEP=[0,5e3,1e4,25e3,5e4,1e5,25e4,5e5,1e6,25e5,5e6,1e7];
 const SZS=[['dist','Скрыть зоны ближе к цене, чем',0,50,.1,v=>v?cm(v.toFixed(1))+'%':'не скрывать'],
   ['whale','Учитывать китов от',0,WSTEP.length-1,1,v=>WSTEP[v]?fmtM(WSTEP[v],1):'все заявки'],
@@ -1620,7 +1623,7 @@ $('#szp').onclick=e=>{const b=e.target.closest('button');if(!b)return;
   if(b.dataset.m||b.dataset.p){const k=b.dataset.m||b.dataset.p,d=SZS.find(x=>x[0]===k);const v=SZC[k],st=k==='dist'?(b.dataset.p?(v<5?.1:v<10?.5:1):(v<=5?.1:v<=10?.5:1)):d[4];setSZ(k,v+(b.dataset.p?st:-st));return}
   if(b.id==='szx'){$('#szp').style.display='none';$('#szcfg').classList.remove('on');return}
   if(b.id==='szon'){S.sz=S.sz===false;save();syncUI();szT=0;renderSZP();return}
-  if(b.id==='szrst'){Object.assign(SZC,{dist:0,sc:45,n:3,whale:0,up:true,dn:true});LS.set('cbSZ',SZC);szT=0;renderSZP()}};
+  if(b.id==='szrst'){Object.assign(SZC,{dist:0,sc:45,n:2,whale:0,up:true,dn:true});LS.set('cbSZ',SZC);szT=0;renderSZP()}};
 /* ---------- на графике ---------- */
 let SZD={key:'',H:null,deep:null,dt:0,z:[],t:0,busy:0};
 function szUpd(){
@@ -1647,15 +1650,15 @@ function drawSZ(w,h,right){
     if(z.wp){const wy=series.priceToCoordinate(z.wp);if(wy!=null){const L=Math.max(30,Math.min(right*.35,right*.35*z.wu/Math.max(...Z.map(q=>q.wu||0),1)));
       ox.fillStyle=`rgba(${col},.95)`;ox.fillRect(right-L,wy-2,L,4);ox.setLineDash([2,3]);ox.strokeStyle=`rgba(${col},.9)`;ox.beginPath();ox.moveTo(0,wy);ox.lineTo(right-L,wy);ox.stroke();ox.setLineDash([]);z._wy=wy}}
     ox.setLineDash([5,4]);ox.strokeStyle=`rgba(${col},${.35+.5*z.sc/100})`;ox.lineWidth=z.sc>=70?1.6:1;ox.beginPath();ox.moveTo(0,top);ox.lineTo(right,top);ox.moveTo(0,top+bh);ox.lineTo(right,top+bh);ox.stroke();ox.setLineDash([]);
-    const t=(act?'⚡ ЦЕНА В ЗОНЕ · ':'🛑 ')+(z.up?'сопр. ':'подд. ')+fPr(z.lo)+'–'+fPr(z.hi)+' · сила '+z.sc+' · '+(z.d>=0?'+':'')+cm(z.d.toFixed(2))+'%'+(!z.wp&&z.tags[0]?' · '+z.tags[0]:''),tw=Math.min(right-16,ox.measureText(t).width+10);
+    const t=(act?'⚡ ':'')+(z.up?'сопр. ':'подд. ')+fPr(z.lo)+'–'+fPr(z.hi)+' · '+z.sc+' · '+(z.d>=0?'+':'')+cm(z.d.toFixed(1))+'%',tw=Math.min(right-16,ox.measureText(t).width+10);
     let ly=top+bh/2;for(const dy of [0,16,-16,32,-32]){const q=ly+dy;if(placed.every(p=>Math.abs(p-q)>=15)){ly=q;break}}placed.push(ly);
-    if(ly<8||ly>h-8)return;
+    if(ly<46||ly>h-8)return;
     ox.fillStyle=`rgba(${col},.85)`;ox.beginPath();ox.roundRect?ox.roundRect(6,ly-8,tw,16,4):ox.rect(6,ly-8,tw,16);ox.fill();
     ox.fillStyle='#fff';ox.fillText(t,11,ly,tw-8);
     /* где стоит кит: точная цена крупнейшей заявки */
-    if(z.wp&&z._wy!=null){const wt='🐋 '+(z.up?'продаёт ':'покупает ')+fmtM(z.wu,1)+' на '+fPr(z.wp);ox.font='700 11px system-ui';const ww=ox.measureText(wt).width+12;
-      let wy=z._wy;for(const dy of [0,16,-16,32,-32]){const q=z._wy+dy;if(placed.every(p=>Math.abs(p-q)>=15)){wy=q;break}}placed.push(wy);
-      if(wy>8&&wy<h-8){const x0=tw+14<right*.55?tw+14:6;ox.fillStyle='rgba(12,15,22,.92)';ox.strokeStyle=`rgb(${col})`;ox.lineWidth=1.5;ox.beginPath();ox.roundRect?ox.roundRect(x0,wy-9,ww,18,9):ox.rect(x0,wy-9,ww,18);ox.fill();ox.stroke();
+    if(z.wp&&z._wy!=null){const wt='🐋 '+fmtM(z.wu,1)+' · '+fPr(z.wp);ox.font='700 11px system-ui';const ww=ox.measureText(wt).width+12;
+      const wy=z._wy;
+      if(wy>46&&wy<h-8&&Math.abs(wy-ly)>=15||wy>46&&wy<h-8&&tw+ww+24<right){const x0=right-ww-6;ox.fillStyle='rgba(12,15,22,.92)';ox.strokeStyle=`rgb(${col})`;ox.lineWidth=1.5;ox.beginPath();ox.roundRect?ox.roundRect(x0,wy-9,ww,18,9):ox.rect(x0,wy-9,ww,18);ox.fill();ox.stroke();
         ox.fillStyle='#fff';ox.fillText(wt,x0+6,wy)}ox.font='600 10.5px system-ui';z._wy=null}});
   ox.restore();
 }
@@ -1676,7 +1679,7 @@ function szCoinRender(){
     +'<div class="szp">● Сейчас '+fPr(CC.p)+'</div>'
     +(dn.length?'<div class="szh">▼ При падении (поддержки)</div>'+dn.map(row).join(''):'')
     +(Z.length?'':'<div class="szn">Сильных зон рядом не найдено</div>')
-    +'<div class="szn">Сила зоны (полоска) = крупные заявки китов в стакане + объёмы, прошедшие на этих ценах раньше + прошлые развороты + аномальные свечи + вчерашние/недельные максимумы и минимумы. Стакан обновляется каждые 15 сек. Нажмите на «📈 График и заявки» — зоны будут нарисованы на графике.</div>';
+    +'<div class="szn">Полоска — сила зоны: киты в стакане, прошлые объёмы и развороты. Обновляется каждые 15 сек.</div>';
 }
 /* ---------- авто-фигуры теханализа ---------- */
 let PATS=[],patT=0,PSRC=null,PC=null,pcT=0,pcKey='';
