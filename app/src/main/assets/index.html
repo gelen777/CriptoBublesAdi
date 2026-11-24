@@ -187,6 +187,14 @@ select,input{outline:none}select:focus,input:focus{border-color:var(--ac)}
 #tfs button.on{background:var(--ac);color:#fff;box-shadow:0 2px 8px rgba(59,130,246,.35)}
 #bar .tl{flex:1 0 auto;white-space:nowrap;padding:7px 6px;border-radius:12px;font-size:12.5px;font-weight:500;background:var(--cd)}
 #ladb.on,#patb.on,#drb.on,#indb.on,#gear.on{background:var(--acs);color:#9cc0ff;border-color:rgba(59,130,246,.55)}
+#szb.on{background:rgba(255,112,67,.18);color:#ffab91;border:1px solid rgba(255,112,67,.7);box-shadow:0 0 10px rgba(255,112,67,.35);font-weight:700}
+#szcfg{flex:0 0 auto!important;padding:7px 10px!important}#szcfg.on{background:rgba(255,112,67,.18);color:#ffab91;border:1px solid rgba(255,112,67,.7)}
+#szp{display:none;padding:8px 12px 10px;background:#0f131b;border-bottom:1px solid #1c2230;font-size:12.5px;color:#c9cfdb}
+#szp .szt{display:flex;align-items:center;gap:8px;margin-bottom:4px}#szp .szt b{flex:1;font-size:13px}
+#szp .szt button,#szp .szs button{background:#1a1f2b;border:1px solid #2a3142;color:#d6dae3;border-radius:9px;min-width:34px;height:30px;font-size:16px;font-weight:700}
+#szp .szs{margin-top:8px}#szp .szs div{display:flex;align-items:center;gap:8px;margin-top:3px}#szp .szs label{display:flex;justify-content:space-between;color:#8b93a7}#szp .szs label b{color:#ffab91}
+#szp input[type=range]{flex:1;accent-color:#ff7043;height:28px}#szp .szk{display:flex;gap:14px;margin-top:8px;flex-wrap:wrap}#szp .szk label{display:flex;gap:5px;align-items:center}
+#szp .sw{position:relative;width:44px;height:24px;border-radius:12px;background:#2a3142;border:0;min-width:0!important}#szp .sw:after{content:'';position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#8b93a7;transition:.2s}#szp .sw.on{background:#ff7043}#szp .sw.on:after{left:23px;background:#fff}
 #panel,#ipanel,#dbar{background:var(--pn);border-bottom:1px solid var(--ln)}
 #panel .sec{background:var(--cd);border:1px solid var(--ln);border-radius:14px}
 #panel .sec h4{font-size:12.5px;color:#c9d0de;text-transform:none}
@@ -235,9 +243,9 @@ select,input{outline:none}select:focus,input:focus{border-color:var(--ac)}
   <div id="bar">
     <div class="r1"><button id="back" aria-label="Назад">‹</button><div class="tt"><span id="ttl"></span><div class="sub"><span id="st">● нет связи</span><span id="dbg"></span></div></div><button id="fstar" class="fs" aria-label="В избранное">☆</button><button id="vw" class="tv">TW</button><button id="gear" aria-label="Настройки">⚙</button></div>
     <div class="r2"><div id="tfs"><button data-tf="1m">1м</button><button data-tf="5m">5м</button><button data-tf="15m">15м</button><button data-tf="1h">1ч</button><button data-tf="4h">4ч</button><button data-tf="1d">1д</button><button data-tf="1w">1н</button></div></div>
-    <div class="r3"><button id="ladb" class="tl" style="display:none"></button><button id="szb" class="tl">🛑 Остановки</button><button id="patb" class="tl">△ Фигуры</button><button id="drb" class="tl">✏ Рисовать</button><button id="indb" class="tl" style="display:none"></button></div>
+    <div class="r3"><button id="ladb" class="tl" style="display:none"></button><button id="szb" class="tl">🛑 Остановки</button><button id="szcfg" class="tl" title="Настроить остановки">⚙</button><button id="patb" class="tl">△ Фигуры</button><button id="drb" class="tl">✏ Рисовать</button><button id="indb" class="tl" style="display:none"></button></div>
   </div>
-  <div id="dbar"></div><div id="ipanel"></div>
+  <div id="dbar"></div><div id="szp"></div><div id="ipanel"></div>
   <div id="panel">
     <div class="ptop"><b id="pn"></b><span></span><button id="rst">Сбросить всё</button><button id="pclose">✕</button></div>
     <div class="sec"><h4>📈 График</h4>
@@ -1261,6 +1269,7 @@ window.cbBack=()=>{
     if(cbVis($('#cv'))){
       if(cbVis($('#ipanel'))){$('#indb').click();return 1}
       if(cbVis($('#panel'))){$('#panel').style.display='none';return 1}
+      if(cbVis($('#szp'))){$('#szx').click();return 1}
       if(cbVis($('#dbar'))){$('#drb').click();return 1}
       $('#back').click();return 1}
     /* окна поверх пузырей — сначала самые верхние (настройки, новости, поиск, карточка монеты) */
@@ -1549,9 +1558,31 @@ function szCalc(H,price,B,A){
     const sc=Math.round(Math.min(100,(TS[i]/mx)*65+Math.min(1,TS[i]/.6)*35));
     out.push({lo:zlo,hi:zhi,mid:(zlo+zhi)/2,up,sc,whale,tags,d:((up?zlo:zhi)/price-1)*100});
   });
-  const pick=up=>out.filter(z=>z.up===up&&z.tags.length&&z.sc>=30).sort((a,b)=>Math.abs(a.d)-Math.abs(b.d)).slice(0,6).sort((a,b)=>b.sc-a.sc).slice(0,4).sort((a,b)=>Math.abs(a.d)-Math.abs(b.d));
+  const pick=up=>out.filter(z=>z.up===up&&z.tags.length&&z.sc>=30).sort((a,b)=>Math.abs(a.d)-Math.abs(b.d)).slice(0,10).sort((a,b)=>b.sc-a.sc).slice(0,7).sort((a,b)=>Math.abs(a.d)-Math.abs(b.d));
   return pick(true).concat(pick(false));
 }
+/* настройки остановок (общие для всех монет) */
+const SZC=Object.assign({dist:0,sc:45,n:3,whale:0,up:true,dn:true},LS.get('cbSZ',{}));
+const WSTEP=[0,5e3,1e4,25e3,5e4,1e5,25e4,5e5,1e6,25e5,5e6,1e7];
+const SZS=[['dist','Скрыть зоны ближе к цене, чем',0,10,.1,v=>v?cm(v.toFixed(1))+'%':'не скрывать'],
+  ['whale','Учитывать китов от',0,WSTEP.length-1,1,v=>WSTEP[v]?fmtM(WSTEP[v],1):'все заявки'],
+  ['sc','Минимальная сила зоны',0,95,5,v=>v],['n','Зон с каждой стороны',1,6,1,v=>v]];
+const szFilter=Z=>[true,false].flatMap(u=>(u?SZC.up:SZC.dn)?Z.filter(z=>z.up===u&&z.sc>=SZC.sc&&Math.abs(z.d)>=SZC.dist).slice(0,SZC.n):[]);
+const szWhale=a=>{const m=WSTEP[SZC.whale]||0;return m?a.filter(x=>x[1]>=m):a};
+function renderSZP(){const on=S.sz!==false;
+  $('#szp').innerHTML='<div class="szt"><b>🛑 Где цена может остановиться</b><button class="sw'+(on?' on':'')+'" id="szon"></button><button id="szx">✕</button></div>'
+    +SZS.map(([k,l,a,b,st,f])=>'<div class="szs"><label>'+l+' <b id="szv_'+k+'">'+f(SZC[k])+'</b></label><div><button data-m="'+k+'">−</button><input type="range" id="szr_'+k+'" min="'+a+'" max="'+b+'" step="'+st+'" value="'+SZC[k]+'"><button data-p="'+k+'">+</button></div></div>').join('')
+    +'<div class="szk"><label><input type="checkbox" id="szup"'+(SZC.up?' checked':'')+'> 🔴 Сопротивления (выше цены)</label><label><input type="checkbox" id="szdn"'+(SZC.dn?' checked':'')+'> 🟢 Поддержки (ниже цены)</label></div>'
+    +'<div class="szt" style="margin-top:8px"><span style="flex:1;color:#6c7488;font-size:11px">Работает и на графике, и в карточке монеты</span><button id="szrst" style="font-size:12px;padding:0 10px">Сбросить</button></div>'}
+function setSZ(k,v){const d=SZS.find(x=>x[0]===k);v=Math.max(d[2],Math.min(d[3],Math.round(v/d[4])*d[4]));SZC[k]=+v.toFixed(2);LS.set('cbSZ',SZC);
+  const r=$('#szr_'+k);if(r)r.value=SZC[k];const t=$('#szv_'+k);if(t)t.textContent=d[5](SZC[k]);szT=0;CSZ.t=0}
+$('#szp').oninput=e=>{const k=(e.target.id||'').replace('szr_','');if(e.target.type==='range')setSZ(k,+e.target.value)};
+$('#szp').onchange=e=>{if(e.target.id==='szup'||e.target.id==='szdn'){SZC[e.target.id.slice(2)]=e.target.checked;LS.set('cbSZ',SZC);szT=0}};
+$('#szp').onclick=e=>{const b=e.target.closest('button');if(!b)return;
+  if(b.dataset.m||b.dataset.p){const k=b.dataset.m||b.dataset.p,d=SZS.find(x=>x[0]===k);setSZ(k,SZC[k]+(b.dataset.p?d[4]:-d[4]));return}
+  if(b.id==='szx'){$('#szp').style.display='none';$('#szcfg').classList.remove('on');return}
+  if(b.id==='szon'){S.sz=S.sz===false;save();syncUI();szT=0;renderSZP();return}
+  if(b.id==='szrst'){Object.assign(SZC,{dist:0,sc:45,n:3,whale:0,up:true,dn:true});LS.set('cbSZ',SZC);szT=0;renderSZP()}};
 /* ---------- на графике ---------- */
 let SZD={key:'',H:null,deep:null,dt:0,z:[],t:0,busy:0};
 function szUpd(){
@@ -1564,17 +1595,19 @@ function szUpd(){
   let B=bookArr(bids),A=bookArr(asks);
   if(D.deep){const bl=B.length?Math.min(...B.map(x=>x[0])):Infinity,ah=A.length?Math.max(...A.map(x=>x[0])):0;
     (D.deep.bids||[]).forEach(([p,q])=>{p=+p;if(p<bl)B.push([p,p*q])});(D.deep.asks||[]).forEach(([p,q])=>{p=+p;if(p>ah)A.push([p,p*q])})}
-  try{D.z=szCalc(D.H,price,B,A);D.t=Date.now()}catch(e){}
+  try{D.z=szCalc(D.H,price,szWhale(B),szWhale(A));D.t=Date.now()}catch(e){}
 }
 function drawSZ(w,h,right){
-  const Z0=SZD.key===CM+cur?SZD.z:[],Z=[true,false].flatMap(u=>Z0.filter(z=>z.up===u&&z.sc>=45).slice(0,3));if(!Z.length)return;const placed=[];
+  const Z0=SZD.key===CM+cur?SZD.z:[],Z=szFilter(Z0);if(!Z.length)return;const placed=[];
   ox.save();ox.font='600 10.5px system-ui';ox.textBaseline='middle';ox.textAlign='left';
   Z.forEach(z=>{const y1=series.priceToCoordinate(z.hi),y2=series.priceToCoordinate(z.lo);if(y1==null||y2==null)return;
     const top=Math.min(y1,y2),bh=Math.max(3,Math.abs(y2-y1));if(top>h||top+bh<0)return;
     const col=z.up?'255,112,67':'38,198,140',a=.08+.2*z.sc/100;
-    ox.fillStyle=`rgba(${col},${a})`;ox.fillRect(0,top,right,bh);
+    const px=lastC?lastC.close:midP,act=px>=z.lo-(z.hi-z.lo)*.3&&px<=z.hi+(z.hi-z.lo)*.3,gl=act?(Math.sin(performance.now()/220)+1)/2:0;
+    ox.fillStyle=`rgba(${col},${a+gl*.18})`;ox.fillRect(0,top,right,bh);
+    if(act){ox.save();ox.shadowColor=`rgb(${col})`;ox.shadowBlur=8+10*gl;ox.strokeStyle=`rgba(${col},${.6+.4*gl})`;ox.lineWidth=2;ox.strokeRect(1,top,right-2,bh);ox.restore()}
     ox.setLineDash([5,4]);ox.strokeStyle=`rgba(${col},${.35+.5*z.sc/100})`;ox.lineWidth=z.sc>=70?1.6:1;ox.beginPath();ox.moveTo(0,top);ox.lineTo(right,top);ox.moveTo(0,top+bh);ox.lineTo(right,top+bh);ox.stroke();ox.setLineDash([]);
-    const t='🛑 '+(z.up?'сопротивление':'поддержка')+' · сила '+z.sc+' · '+(z.d>=0?'+':'')+cm(z.d.toFixed(2))+'%'+(z.tags[0]?' · '+z.tags[0]:''),tw=Math.min(right-16,ox.measureText(t).width+10);
+    const t=(act?'⚡ ЦЕНА В ЗОНЕ · ':'🛑 ')+(z.up?'сопротивление':'поддержка')+' · сила '+z.sc+' · '+(z.d>=0?'+':'')+cm(z.d.toFixed(2))+'%'+(z.tags[0]?' · '+z.tags[0]:''),tw=Math.min(right-16,ox.measureText(t).width+10);
     let ly=top+bh/2;for(const dy of [0,16,-16,32,-32]){const q=ly+dy;if(placed.every(p=>Math.abs(p-q)>=15)){ly=q;break}}placed.push(ly);
     if(ly<8||ly>h-8)return;
     ox.fillStyle=`rgba(${col},.85)`;ox.beginPath();ox.roundRect?ox.roundRect(6,ly-8,tw,16,4):ox.rect(6,ly-8,tw,16);ox.fill();
@@ -1591,7 +1624,7 @@ function szCoinRender(){
   if(!CSZ.H){e.innerHTML='<div class="h3">🛑 Где цена может остановиться</div><div class="szn">⏳ Анализирую стакан и объёмы…</div>';return}
   if(Date.now()-CSZ.t<2500)return;CSZ.t=Date.now();
   const d=CSZ.dp||{bids:[],asks:[]},B=(d.bids||[]).map(([p,q])=>[+p,+p*q]),A=(d.asks||[]).map(([p,q])=>[+p,+p*q]);
-  const Z=szCalc(CSZ.H,CC.p,B,A),row=z=>'<div class="szr" data-p="'+z.mid+'"><div class="szl" style="border-color:'+(z.up?'#ff7043':'#26c68c')+'"><b>'+fPr(z.lo)+' – '+fPr(z.hi)+'</b><span style="color:'+(z.up?'#ff8a65':'#4dd9a3')+'">'+(z.d>=0?'+':'')+cm(z.d.toFixed(2))+'%</span><i style="width:'+z.sc+'%;background:'+(z.up?'#ff7043':'#26c68c')+'"></i></div><small>'+z.tags.map(esc).join(' · ')+'</small></div>';
+  const Z=szFilter(szCalc(CSZ.H,CC.p,szWhale(B),szWhale(A))),row=z=>'<div class="szr" data-p="'+z.mid+'"><div class="szl" style="border-color:'+(z.up?'#ff7043':'#26c68c')+'"><b>'+fPr(z.lo)+' – '+fPr(z.hi)+'</b><span style="color:'+(z.up?'#ff8a65':'#4dd9a3')+'">'+(z.d>=0?'+':'')+cm(z.d.toFixed(2))+'%</span><i style="width:'+z.sc+'%;background:'+(z.up?'#ff7043':'#26c68c')+'"></i></div><small>'+z.tags.map(esc).join(' · ')+'</small></div>';
   const up=Z.filter(z=>z.up).reverse(),dn=Z.filter(z=>!z.up);
   e.innerHTML='<div class="h3">🛑 Где цена может остановиться</div>'
     +(up.length?'<div class="szh">▲ При росте (сопротивления)</div>'+up.map(row).join(''):'')
@@ -2093,7 +2126,8 @@ st.addEventListener('pointermove',e=>{if(!drag)return;const m=$('#main').getBoun
 st.addEventListener('pointerup',()=>{if(drag){drag=null;save()}});}
 $('#tpos').onclick=()=>{S.tpos=null;save();renderStat()};
 $('#rst').onclick=()=>{S=Object.assign({},DEF,{view:S.view});save();syncUI();applySide();lastCalc=0;list=[];seen.clear();fading=[];if(chart)load();if(S.view==='tv')showTV()};
-$('#szb').onclick=()=>{S.sz=S.sz===false;save();syncUI();szT=0;if(S.sz)toast('🛑 Зоны, где цена может остановиться: красные — выше цены, зелёные — ниже')};
+$('#szcfg').onclick=()=>{const p=$('#szp'),o=p.style.display==='block';if(!o)renderSZP();p.style.display=o?'none':'block';$('#szcfg').classList.toggle('on',!o)};
+$('#szb').onclick=()=>{S.sz=S.sz===false;save();syncUI();szT=0;if($('#szp').style.display==='block')renderSZP();if(S.sz)toast('🛑 Зоны, где цена может остановиться: красные — выше цены, зелёные — ниже')};
 $('#patb').onclick=()=>{S.pt=!(S.pt!==false);save();syncUI();patT=0};
 $('#ladb').onclick=()=>{S.lad=!S.lad;save();syncUI();applySide();lastSide=0;lastCalc=0};
 $('#pclose').onclick=()=>{$('#panel').style.display='none'};
