@@ -1515,13 +1515,14 @@ async function szHist(mk,sym){
   const r={t:Date.now(),h1:map(a),h4:map(b)};SZH.set(key,r);if(SZH.size>25)SZH.delete(SZH.keys().next().value);return r;
 }
 const bookArr=m=>{const o=[];m.forEach((q,p)=>{p=+p;o.push([p,p*q])});return o};
-function szCalc(H,price,B,A){
+function szCalc(H,price,B,A,md){md=md||0;
   const h1=H.h1,h4=H.h4;if(!h1||h1.length<60||!(price>0))return [];
-  const atr=atrN(h1,48)||price*.005,step=Math.max(price*.0012,atr*.22),span=Math.max(price*.1,atr*25),lo=price-span,N=Math.ceil(2*span/step);
-  const ix=p=>Math.floor((p-lo)/step),Z=()=>new Float64Array(N),bk=Z(),vp=Z(),sw=Z(),an=Z(),ms=Z(),bkB=Z(),bkA=Z(),swN=Z(),anN=Z(),ML=[];
+  const atr=atrN(h1,48)||price*.005,step=Math.max(price*.0012,atr*.22),span=Math.min(price*.62,Math.max(price*.1,atr*25,price*(md/100+.08))),lo=price-span,N=Math.ceil(2*span/step);
+  const ix=p=>Math.floor((p-lo)/step),Z=()=>new Float64Array(N),wU=Z(),wP=Z(),bk=Z(),vp=Z(),sw=Z(),an=Z(),ms=Z(),bkB=Z(),bkA=Z(),swN=Z(),anN=Z(),ML=[];
   const put=(a,p,v)=>{const i=ix(p);if(i>=0&&i<N)a[i]+=v};
   /* 🐋 стакан: заявки выше цены — продавцы, ниже — покупатели */
-  B.forEach(([p,u])=>{if(p<=price){put(bk,p,u);put(bkB,p,u)}});A.forEach(([p,u])=>{if(p>=price){put(bk,p,u);put(bkA,p,u)}});
+  const big=(p,u)=>{const i=ix(p);if(i>=0&&i<N&&u>wU[i]){wU[i]=u;wP[i]=p}};
+  B.forEach(([p,u])=>{if(p<=price){put(bk,p,u);put(bkB,p,u);big(p,u)}});A.forEach(([p,u])=>{if(p>=price){put(bk,p,u);put(bkA,p,u);big(p,u)}});
   /* 📊 профиль объёма */
   const prof=(c,w)=>c.forEach(x=>{const a=Math.max(lo,x.l),b=Math.min(lo+span*2,x.h);if(b<a)return;const i0=Math.max(0,ix(a)),i1=Math.min(N-1,ix(b)),v=x.q*w/(i1-i0+1);for(let i=i0;i<=i1;i++)vp[i]+=v});
   prof(h1,1);if(h4.length)prof(h4.filter(x=>x.t<h1[0].t),.6);
@@ -1549,22 +1550,23 @@ function szCalc(H,price,B,A){
     while(a>0&&a>i-3&&TS[a-1]>TS[i]*.68&&!used[a-1]&&a-1!==ip)a--;while(b<N-1&&b<i+3&&TS[b+1]>TS[i]*.68&&!used[b+1]&&b+1!==ip)b++;
     for(let j=a;j<=b;j++)used[j]=1;
     const zlo=lo+a*step,zhi=lo+(b+1)*step,up=zlo>price,sum=(x)=>{let s=0;for(let j=a;j<=b;j++)s+=x[j];return s},mxv=x=>{let s=0;for(let j=a;j<=b;j++)s=Math.max(s,x[j]);return s};
-    const whale=up?sum(bkA):sum(bkB),tags=[];
-    if(mxv(nb)>=.8)tags.push('🐋 '+(up?'продажи ':'покупки ')+fmtM(whale,1));
+    const whale=up?sum(bkA):sum(bkB),tags=[];let wi=-1;for(let j=a;j<=b;j++)if(wU[j]>0&&(wi<0||wU[j]>wU[wi]))wi=j;
+    const wp=wi>=0?wP[wi]:0,wu=wi>=0?wU[wi]:0;
+    if(mxv(nb)>=.8)tags.push('🐋 '+(up?'продажи ':'покупки ')+fmtM(whale,1)+(wp?' · крупнейшая '+fmtM(wu,1)+' на '+fPr(wp):''));
     if(mxv(nv)>=.7)tags.push('📊 большой объём в прошлом');
     const tc=sum(swN);if(tc>=2)tags.push('↕ разворачивалась '+tc+' р.');
     if(mxv(na)>=.5)tags.push('💥 аномальный объём');
     const ml=[...new Set(ML.filter(x=>x[0]>=zlo-step*.5&&x[0]<=zhi+step*.5).map(x=>x[1]))];ml.forEach(t=>tags.push((t==='круглая цена'?'🔘 ':'📅 ')+t));
     const sc=Math.round(Math.min(100,(TS[i]/mx)*65+Math.min(1,TS[i]/.6)*35));
-    out.push({lo:zlo,hi:zhi,mid:(zlo+zhi)/2,up,sc,whale,tags,d:((up?zlo:zhi)/price-1)*100});
+    out.push({lo:zlo,hi:zhi,mid:(zlo+zhi)/2,up,sc,whale,wp:mxv(nb)>=.8?wp:0,wu,tags,d:((up?zlo:zhi)/price-1)*100});
   });
-  const pick=up=>out.filter(z=>z.up===up&&z.tags.length&&z.sc>=30).sort((a,b)=>Math.abs(a.d)-Math.abs(b.d)).slice(0,10).sort((a,b)=>b.sc-a.sc).slice(0,7).sort((a,b)=>Math.abs(a.d)-Math.abs(b.d));
+  const pick=up=>out.filter(z=>z.up===up&&z.tags.length&&z.sc>=30&&Math.abs(z.d)>=md).sort((a,b)=>Math.abs(a.d)-Math.abs(b.d)).slice(0,10).sort((a,b)=>b.sc-a.sc).slice(0,7).sort((a,b)=>Math.abs(a.d)-Math.abs(b.d));
   return pick(true).concat(pick(false));
 }
 /* настройки остановок (общие для всех монет) */
 const SZC=Object.assign({dist:0,sc:45,n:3,whale:0,up:true,dn:true},LS.get('cbSZ',{}));
 const WSTEP=[0,5e3,1e4,25e3,5e4,1e5,25e4,5e5,1e6,25e5,5e6,1e7];
-const SZS=[['dist','Скрыть зоны ближе к цене, чем',0,10,.1,v=>v?cm(v.toFixed(1))+'%':'не скрывать'],
+const SZS=[['dist','Скрыть зоны ближе к цене, чем',0,50,.1,v=>v?cm(v.toFixed(1))+'%':'не скрывать'],
   ['whale','Учитывать китов от',0,WSTEP.length-1,1,v=>WSTEP[v]?fmtM(WSTEP[v],1):'все заявки'],
   ['sc','Минимальная сила зоны',0,95,5,v=>v],['n','Зон с каждой стороны',1,6,1,v=>v]];
 const szFilter=Z=>[true,false].flatMap(u=>(u?SZC.up:SZC.dn)?Z.filter(z=>z.up===u&&z.sc>=SZC.sc&&Math.abs(z.d)>=SZC.dist).slice(0,SZC.n):[]);
@@ -1579,7 +1581,7 @@ function setSZ(k,v){const d=SZS.find(x=>x[0]===k);v=Math.max(d[2],Math.min(d[3],
 $('#szp').oninput=e=>{const k=(e.target.id||'').replace('szr_','');if(e.target.type==='range')setSZ(k,+e.target.value)};
 $('#szp').onchange=e=>{if(e.target.id==='szup'||e.target.id==='szdn'){SZC[e.target.id.slice(2)]=e.target.checked;LS.set('cbSZ',SZC);szT=0}};
 $('#szp').onclick=e=>{const b=e.target.closest('button');if(!b)return;
-  if(b.dataset.m||b.dataset.p){const k=b.dataset.m||b.dataset.p,d=SZS.find(x=>x[0]===k);setSZ(k,SZC[k]+(b.dataset.p?d[4]:-d[4]));return}
+  if(b.dataset.m||b.dataset.p){const k=b.dataset.m||b.dataset.p,d=SZS.find(x=>x[0]===k);const v=SZC[k],st=k==='dist'?(b.dataset.p?(v<5?.1:v<10?.5:1):(v<=5?.1:v<=10?.5:1)):d[4];setSZ(k,v+(b.dataset.p?st:-st));return}
   if(b.id==='szx'){$('#szp').style.display='none';$('#szcfg').classList.remove('on');return}
   if(b.id==='szon'){S.sz=S.sz===false;save();syncUI();szT=0;renderSZP();return}
   if(b.id==='szrst'){Object.assign(SZC,{dist:0,sc:45,n:3,whale:0,up:true,dn:true});LS.set('cbSZ',SZC);szT=0;renderSZP()}};
@@ -1595,7 +1597,7 @@ function szUpd(){
   let B=bookArr(bids),A=bookArr(asks);
   if(D.deep){const bl=B.length?Math.min(...B.map(x=>x[0])):Infinity,ah=A.length?Math.max(...A.map(x=>x[0])):0;
     (D.deep.bids||[]).forEach(([p,q])=>{p=+p;if(p<bl)B.push([p,p*q])});(D.deep.asks||[]).forEach(([p,q])=>{p=+p;if(p>ah)A.push([p,p*q])})}
-  try{D.z=szCalc(D.H,price,szWhale(B),szWhale(A));D.t=Date.now()}catch(e){}
+  try{D.z=szCalc(D.H,price,szWhale(B),szWhale(A),SZC.dist);D.t=Date.now()}catch(e){}
 }
 function drawSZ(w,h,right){
   const Z0=SZD.key===CM+cur?SZD.z:[],Z=szFilter(Z0);if(!Z.length)return;const placed=[];
@@ -1606,12 +1608,19 @@ function drawSZ(w,h,right){
     const px=lastC?lastC.close:midP,act=px>=z.lo-(z.hi-z.lo)*.3&&px<=z.hi+(z.hi-z.lo)*.3,gl=act?(Math.sin(performance.now()/220)+1)/2:0;
     ox.fillStyle=`rgba(${col},${a+gl*.18})`;ox.fillRect(0,top,right,bh);
     if(act){ox.save();ox.shadowColor=`rgb(${col})`;ox.shadowBlur=8+10*gl;ox.strokeStyle=`rgba(${col},${.6+.4*gl})`;ox.lineWidth=2;ox.strokeRect(1,top,right-2,bh);ox.restore()}
+    if(z.wp){const wy=series.priceToCoordinate(z.wp);if(wy!=null){const L=Math.max(30,Math.min(right*.35,right*.35*z.wu/Math.max(...Z.map(q=>q.wu||0),1)));
+      ox.fillStyle=`rgba(${col},.95)`;ox.fillRect(right-L,wy-2,L,4);ox.setLineDash([2,3]);ox.strokeStyle=`rgba(${col},.9)`;ox.beginPath();ox.moveTo(0,wy);ox.lineTo(right-L,wy);ox.stroke();ox.setLineDash([]);z._wy=wy}}
     ox.setLineDash([5,4]);ox.strokeStyle=`rgba(${col},${.35+.5*z.sc/100})`;ox.lineWidth=z.sc>=70?1.6:1;ox.beginPath();ox.moveTo(0,top);ox.lineTo(right,top);ox.moveTo(0,top+bh);ox.lineTo(right,top+bh);ox.stroke();ox.setLineDash([]);
-    const t=(act?'⚡ ЦЕНА В ЗОНЕ · ':'🛑 ')+(z.up?'сопротивление':'поддержка')+' · сила '+z.sc+' · '+(z.d>=0?'+':'')+cm(z.d.toFixed(2))+'%'+(z.tags[0]?' · '+z.tags[0]:''),tw=Math.min(right-16,ox.measureText(t).width+10);
+    const t=(act?'⚡ ЦЕНА В ЗОНЕ · ':'🛑 ')+(z.up?'сопр. ':'подд. ')+fPr(z.lo)+'–'+fPr(z.hi)+' · сила '+z.sc+' · '+(z.d>=0?'+':'')+cm(z.d.toFixed(2))+'%'+(!z.wp&&z.tags[0]?' · '+z.tags[0]:''),tw=Math.min(right-16,ox.measureText(t).width+10);
     let ly=top+bh/2;for(const dy of [0,16,-16,32,-32]){const q=ly+dy;if(placed.every(p=>Math.abs(p-q)>=15)){ly=q;break}}placed.push(ly);
     if(ly<8||ly>h-8)return;
     ox.fillStyle=`rgba(${col},.85)`;ox.beginPath();ox.roundRect?ox.roundRect(6,ly-8,tw,16,4):ox.rect(6,ly-8,tw,16);ox.fill();
-    ox.fillStyle='#fff';ox.fillText(t,11,ly,tw-8)});
+    ox.fillStyle='#fff';ox.fillText(t,11,ly,tw-8);
+    /* где стоит кит: точная цена крупнейшей заявки */
+    if(z.wp&&z._wy!=null){const wt='🐋 '+(z.up?'продаёт ':'покупает ')+fmtM(z.wu,1)+' на '+fPr(z.wp);ox.font='700 11px system-ui';const ww=ox.measureText(wt).width+12;
+      let wy=z._wy;for(const dy of [0,16,-16,32,-32]){const q=z._wy+dy;if(placed.every(p=>Math.abs(p-q)>=15)){wy=q;break}}placed.push(wy);
+      if(wy>8&&wy<h-8){const x0=tw+14<right*.55?tw+14:6;ox.fillStyle='rgba(12,15,22,.92)';ox.strokeStyle=`rgb(${col})`;ox.lineWidth=1.5;ox.beginPath();ox.roundRect?ox.roundRect(x0,wy-9,ww,18,9):ox.rect(x0,wy-9,ww,18);ox.fill();ox.stroke();
+        ox.fillStyle='#fff';ox.fillText(wt,x0+6,wy)}ox.font='600 10.5px system-ui';z._wy=null}});
   ox.restore();
 }
 /* ---------- в карточке монеты ---------- */
@@ -1624,7 +1633,7 @@ function szCoinRender(){
   if(!CSZ.H){e.innerHTML='<div class="h3">🛑 Где цена может остановиться</div><div class="szn">⏳ Анализирую стакан и объёмы…</div>';return}
   if(Date.now()-CSZ.t<2500)return;CSZ.t=Date.now();
   const d=CSZ.dp||{bids:[],asks:[]},B=(d.bids||[]).map(([p,q])=>[+p,+p*q]),A=(d.asks||[]).map(([p,q])=>[+p,+p*q]);
-  const Z=szFilter(szCalc(CSZ.H,CC.p,szWhale(B),szWhale(A))),row=z=>'<div class="szr" data-p="'+z.mid+'"><div class="szl" style="border-color:'+(z.up?'#ff7043':'#26c68c')+'"><b>'+fPr(z.lo)+' – '+fPr(z.hi)+'</b><span style="color:'+(z.up?'#ff8a65':'#4dd9a3')+'">'+(z.d>=0?'+':'')+cm(z.d.toFixed(2))+'%</span><i style="width:'+z.sc+'%;background:'+(z.up?'#ff7043':'#26c68c')+'"></i></div><small>'+z.tags.map(esc).join(' · ')+'</small></div>';
+  const Z=szFilter(szCalc(CSZ.H,CC.p,szWhale(B),szWhale(A),SZC.dist)),row=z=>'<div class="szr" data-p="'+z.mid+'"><div class="szl" style="border-color:'+(z.up?'#ff7043':'#26c68c')+'"><b>'+fPr(z.lo)+' – '+fPr(z.hi)+'</b><span style="color:'+(z.up?'#ff8a65':'#4dd9a3')+'">'+(z.d>=0?'+':'')+cm(z.d.toFixed(2))+'%</span><i style="width:'+z.sc+'%;background:'+(z.up?'#ff7043':'#26c68c')+'"></i></div><small>'+z.tags.map(esc).join(' · ')+'</small></div>';
   const up=Z.filter(z=>z.up).reverse(),dn=Z.filter(z=>!z.up);
   e.innerHTML='<div class="h3">🛑 Где цена может остановиться</div>'
     +(up.length?'<div class="szh">▲ При росте (сопротивления)</div>'+up.map(row).join(''):'')
