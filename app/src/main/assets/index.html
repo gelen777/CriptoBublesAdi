@@ -533,13 +533,22 @@ function connectTicker(){
 }
 /* если свечей нет (фьючерсы без спот-пары) — изменение за короткие периоды считаем по собственной истории цен, которая копится, пока приложение открыто */
 const PMS={m1:6e4,m5:3e5,m15:9e5,h1:36e5};
-setInterval(()=>{const t=Date.now();coins.forEach(c=>{const h=c.hs||(c.hs=[]);h.push([t,c.p]);if(h.length>130)h.shift()})},30000);
+/* ---- своя история цен для коротких периодов (1м/5м/15м/1ч) ----
+   каждые 10 сек запоминаем цену каждой монеты (храним 62 мин). Изменение за период = текущая цена против
+   цены ровно «период назад» (с интерполяцией) — обновляется каждую секунду, окно сдвигается вживую.
+   Пока своей истории не хватает, её дополняют точки из Binance (цена в начале окна). */
+function hsAdd(c,t,p){if(!(p>0))return;const h=c.hs||(c.hs=[]);if(!h.length||t>=h[h.length-1][0]){h.push([t,p]);return}
+  let i=h.length-1;while(i>0&&h[i-1][0]>t)i--;if(Math.abs(h[i][0]-t)<5000){h[i]=[t,p];return}h.splice(i,0,[t,p])}
+function priceAgo(c,ms){const h=c.hs;if(!h||!h.length)return null;const t=Date.now()-ms;if(h[0][0]>t+20000)return null;
+  for(let i=h.length-1;i>=0;i--)if(h[i][0]<=t){const a=h[i],b=h[i+1];if(!b)return a[1];return a[1]+(b[1]-a[1])*(t-a[0])/(b[0]-a[0])}
+  return h[0][1]}
+setInterval(()=>{const t=Date.now(),old=t-372e4;coins.forEach(c=>{if(!(c.p>0))return;hsAdd(c,t,c.p);if(!c.hs0)c.hs0=t;const h=c.hs;let k=0;while(k<h.length&&h[k][0]<old)k++;if(k)h.splice(0,k)})},10000);
 const chg=(c,cf)=>{
   if(cf.per==='d1')return c.o?(c.p/c.o-1)*100:0;
   if(cf.per==='h1'||cf.per==='h4'){const v=rwPct(c,cf.per==='h1'?'1h':'4h');if(v!=null)return v}
+  const ms=PMS[cf.per];
+  if(ms){const pa=priceAgo(c,ms);if(pa)return (c.p/pa-1)*100}
   if(c.bp===cf.per&&c.base)return (c.p/c.base-1)*100;
-  const ms=PMS[cf.per],h=c.hs,t=Date.now();
-  if(ms&&h&&h.length&&t-h[0][0]>=ms*.9){let b=h[0][1];for(const x of h)if(t-x[0]<=ms){b=x[1];break}return b?(c.p/b-1)*100:0}
   return 0;
 };
 let pmax=1;
@@ -628,7 +637,8 @@ async function ensureBase(){
   const key=AS.mkt+cf.per;if(baseRun===key)return;   /* не перезапускаем, пока идёт загрузка того же периода */
   baseRun=key;const my=++baseTok,mk0=AS.mkt,now=Date.now(),[iv,lim]=P.b;
   try{
-    let need=VIS.filter(c=>(c.bp!==cf.per||(P.live&&now-c.bt>60000))&&!(c.kf&&now-c.kf<9e4));
+    const pms=PMS[cf.per]||0,own=c=>pms&&c.hs0&&now-c.hs0>pms+20000;   /* своя история уже покрывает окно — запрос не нужен */
+    let need=VIS.filter(c=>(c.bp!==cf.per||(P.live&&now-c.bt>60000&&!own(c)))&&!(c.kf&&now-c.kf<9e4));
     BST.per=cf.per;BST.tot=VIS.length;
     /* пакетные скользящие окна (спот и фьючерсы через спот-пару) */
     const WS={m1:'1m',m5:'5m',m15:'15m',h1:'1h',h4:'4h',w1:'7d'}[cf.per];
@@ -641,12 +651,12 @@ async function ensureBase(){
         const m=new Map(r.map(x=>[x.symbol,x]));
         need.forEach(c=>{const e=map.get(c);if(!e)return;const [ss,f]=e,x=m.get(ss);if(!x||!+x.openPrice)return;
           if(mk0==='fut'&&c.p&&Math.abs(+x.lastPrice*f/c.p-1)>.03)return;        /* спот-пара — другая монета */
-          c.base=c.p/(+x.lastPrice/+x.openPrice);c.bp=cf.per;c.bt=Date.now();c.kf=0});baseProg(cf.per,RWW)}
-      need=need.filter(c=>c.bp!==cf.per||(P.live&&Date.now()-c.bt>60000));
+          c.base=c.p/(+x.lastPrice/+x.openPrice);c.bp=cf.per;c.bt=Date.now();c.kf=0;if(pms)hsAdd(c,Date.now()-pms,c.base)});baseProg(cf.per,RWW)}
+      need=need.filter(c=>c.bp!==cf.per||(P.live&&Date.now()-c.bt>60000&&!own(c)));
     }
     /* свечи по одной монете — для остальных */
     let idx=0;const work=async()=>{while(idx<need.length&&my===baseTok){const c=need[idx++];
-      try{const k=await apiK(mk0,c.s,iv,lim);if(k&&k.length){c.base=+k[0][1];c.bp=cf.per;c.bt=Date.now();c.kf=0}else c.kf=Date.now()}catch(e){c.kf=Date.now();baseErr++}
+      try{const k=await apiK(mk0,c.s,iv,lim);if(k&&k.length){c.base=+k[0][1];c.bp=cf.per;c.bt=Date.now();c.kf=0;if(pms){k.forEach(r=>hsAdd(c,+r[0],+r[1]))}}else c.kf=Date.now()}catch(e){c.kf=Date.now();baseErr++}
       if(idx%20===0)baseProg(cf.per,RWW)}};
     await Promise.all(Array.from({length:10},work));
   }finally{if(baseRun===key)baseRun=null;baseProg(cf.per,RWW)}
