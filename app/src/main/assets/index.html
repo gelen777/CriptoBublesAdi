@@ -572,8 +572,11 @@ function rwPct(c,win){const m=RW[win];if(!m)return null;const [ss,f]=AS.mkt==='f
 async function rollBatch(syms,ws){ /* пакет с делением пополам, если какой-то символ не принят */
   if(!syms.length)return [];
   try{return await bj('/api/v3/ticker?symbols='+encodeURIComponent(JSON.stringify(syms))+'&windowSize='+ws)||[]}
-  catch(e){if(syms.length<=3)return [];const h=syms.length>>1;return (await rollBatch(syms.slice(0,h),ws)).concat(await rollBatch(syms.slice(h),ws))}}
+  catch(e){const bad=/http 4|nvalid symbol|-1121|-1100/.test(String(e&&e.message||e));
+    if(!bad)throw e;                                        /* нет связи — не дробим (раньше это тянулось десятки минут) */
+    if(syms.length<=3)return [];const h=syms.length>>1;return (await rollBatch(syms.slice(0,h),ws)).concat(await rollBatch(syms.slice(h),ws))}}
 let baseRun=null,baseErr=0;const BST={per:'',ok:0,tot:0};
+function baseProg(per,w){BST.ok=VIS.filter(c=>c.bp===per||(w&&rwPct(c,w)!=null)).length;updHint()}
 async function ensureBase(){
   const cf=cfg(),P=PER[cf.per];const RWW={h1:'1h',h4:'4h'}[cf.per];if(RWW)rwStream(RWW);
   if(!P.b)return;
@@ -588,17 +591,19 @@ async function ensureBase(){
       const map=new Map();need.forEach(c=>{const [ss,f]=mk0==='fut'?FSP(c.s):[c.s,1];map.set(c,[ss,f])});
       const syms=[...new Set([...map.values()].map(x=>x[0]))];
       for(let i=0;i<syms.length;i+=100){if(my!==baseTok)return;
-        const r=await rollBatch(syms.slice(i,i+100),WS),m=new Map(r.map(x=>[x.symbol,x]));
+        let r;try{r=await rollBatch(syms.slice(i,i+100),WS)}catch(e){break}
+        const m=new Map(r.map(x=>[x.symbol,x]));
         need.forEach(c=>{const [ss,f]=map.get(c),x=m.get(ss);if(!x||!+x.openPrice)return;
           if(mk0==='fut'&&c.p&&Math.abs(+x.lastPrice*f/c.p-1)>.03)return;        /* спот-пара — другая монета */
-          c.base=c.p/(+x.lastPrice/+x.openPrice);c.bp=cf.per;c.bt=Date.now();c.kf=0})}
+          c.base=c.p/(+x.lastPrice/+x.openPrice);c.bp=cf.per;c.bt=Date.now();c.kf=0});baseProg(cf.per,RWW)}
       need=need.filter(c=>c.bp!==cf.per||(P.live&&Date.now()-c.bt>60000));
     }
     /* свечи по одной монете — для остальных */
     let idx=0;const work=async()=>{while(idx<need.length&&my===baseTok){const c=need[idx++];
-      try{const k=await apiK(mk0,c.s,iv,lim);if(k&&k.length){c.base=+k[0][1];c.bp=cf.per;c.bt=Date.now();c.kf=0}else c.kf=Date.now()}catch(e){c.kf=Date.now();baseErr++}}};
+      try{const k=await apiK(mk0,c.s,iv,lim);if(k&&k.length){c.base=+k[0][1];c.bp=cf.per;c.bt=Date.now();c.kf=0}else c.kf=Date.now()}catch(e){c.kf=Date.now();baseErr++}
+      if(idx%20===0)baseProg(cf.per,RWW)}};
     await Promise.all(Array.from({length:8},work));
-  }finally{if(baseRun===key)baseRun=null;BST.ok=VIS.filter(c=>c.bp===cf.per||(RWW&&rwPct(c,RWW)!=null)).length;updHint()}
+  }finally{if(baseRun===key)baseRun=null;baseProg(cf.per,RWW)}
 }
 function updHint(){if(!coins.size)return;const cp=cfg().per,ld=PER[cp].b&&BST.per===cp&&BST.ok<VIS.length*.9?' · загружено '+BST.ok+'/'+VIS.length:'';const t='Binance '+(AS.mkt==='fut'?'Фьючерсы':'Спот')+' · '+PER[cp].l+' · '+VIS.length+' монет'+ld+(AS.sort!=='all'?' · список':''),h=$('#hint');if(h.textContent!==t)h.textContent=t}
 function applyCfg(noPanel){
@@ -673,12 +678,13 @@ function tickBubbles(){
     /* «Производительность»: ПЛОЩАДЬ пузыря пропорциональна |%|  (10% = вдвое больше 5%).
        r = r0 + k·√|%| — маленькая база r0, чтобы монеты около 0% было видно, порядок размеров всегда совпадает с порядком %.
        Масштаб k общий для всех: заполняем ~60% экрана, самый большой пузырь не больше rmax (без обрезки отдельных пузырей). */
-    const r0=Math.max(4,Math.min(W,H)*.012);let mx=0,S2=0,S1=0;
+    const ravg=Math.sqrt(FILL*W*(H-BTOP)/(a.length*Math.PI)),r0=Math.max(4,ravg*.35);let mx=0,S2=0,S1=0;
     a.forEach(c=>{c.rr=Math.sqrt(Math.abs(c.ch));mx=Math.max(mx,c.rr);S1+=c.rr;S2+=c.rr*c.rr});
     /* решаем π·Σ(r0+k·q)² = 0.6·W·H относительно k */
     const T=FILL*W*(H-BTOP)/Math.PI,n=a.length,qa=S2,qb=2*r0*S1,qc=n*r0*r0-T;
     let k=qa>0?(-qb+Math.sqrt(Math.max(0,qb*qb-4*qa*qc)))/(2*qa):0;if(mx>0)k=Math.min(k,(rmax-r0)/mx);
-    a.forEach(c=>{c.tr=r0+k*c.rr});
+    if(mx<1e-6||!(k>0))a.forEach(c=>{c.tr=Math.min(rmax,ravg)});   /* все 0% (данные ещё грузятся) — одинаковые пузыри на весь экран */
+    else a.forEach(c=>{c.tr=r0+k*c.rr});
   }else{
     let A=0;a.forEach(c=>{c.rr=1+2.2*met(c);A+=Math.PI*c.rr*c.rr});
     const rmin=Math.min(Math.max(7,Math.min(W,H)*.017),Math.sqrt(.3*W*H/(a.length*Math.PI)));
