@@ -543,7 +543,7 @@ const chg=(c,cf)=>{
   return 0;
 };
 let pmax=1;
-let VIS=[],visT=0,p95=1,p95T=0,LM={mc:[0,1],vol:[0,1]},baseTok=0;
+let VIS=[],visT=0,p95=1,pmed=.1,actShare=1,p95T=0,LM={mc:[0,1],vol:[0,1]},baseTok=0;
 function visible(){
   const cf=cfg(),s=AS.sort;let v=[...coins.values()];v.forEach(c=>{c.st=!isNew(c)&&isStable(c)});
   if(s==='fav')v=v.filter(c=>LISTS.fav.includes(c.s));
@@ -712,7 +712,7 @@ function tickBubbles(){
   if(!a.length||W<50||H<50)return;
   a.forEach(c=>c.ch=chg(c,cf));
   if(now-p95T>1500){p95T=now;
-    const v=a.map(c=>Math.abs(c.ch)).sort((x,y)=>x-y);p95=Math.max(.01,v[Math.floor(v.length*.93)]||.01);pmax=Math.max(.01,v[v.length-1]||.01);
+    const v=a.map(c=>Math.abs(c.ch)).sort((x,y)=>x-y);p95=Math.max(.01,v[Math.floor(v.length*.93)]||.01);pmed=Math.max(.005,v[v.length>>1]||.005);actShare=v.filter(x=>x>pmed*2.5).length/Math.max(1,v.length);pmax=Math.max(.01,v[v.length-1]||.01);
     const lg=k=>{const z=a.map(c=>c[k]).filter(x=>x>0);return z.length?[Math.log(Math.min(...z)),Math.log(Math.max(...z))]:[0,1]};LM={mc:lg('mc'),vol:lg('vol')}}
   const met=c=>{switch(cf.size){
     case 'rank':{const m=c.rk?1-(c.rk-1)/mkMax:0;return cf.srev?1-m:m}
@@ -727,7 +727,11 @@ function tickBubbles(){
     const ravg=Math.sqrt(FILL*W*(H-BTOP)/(a.length*Math.PI)),r0=Math.max(6,ravg*.42);let mx=0,S2=0,S1=0;
     /* редкий огромный выброс не должен сжимать всех остальных: % выше 3×p95 растут уже слабее */
     const cap=p95*3;
-    a.forEach(c=>{const v=Math.abs(c.ch);c.rr=Math.sqrt(v<=cap?v:cap+Math.sqrt(v-cap)*Math.sqrt(cap));mx=Math.max(mx,c.rr);S1+=c.rr;S2+=c.rr*c.rr});
+    /* мало активных монет (рынок спокойный) — каждая активная заметно крупнее остальных, чтобы выделялась */
+    const few=actShare<.2,bst=few?(.2-actShare)/.2:0;
+    a.forEach(c=>{const v=Math.abs(c.ch);c.rr=Math.sqrt(v<=cap?v:cap+Math.sqrt(v-cap)*Math.sqrt(cap));
+      if(bst&&v>pmed*2.5)c.rr*=1+.6*bst*Math.min(1,(v/pmed-2.5)/4);
+      mx=Math.max(mx,c.rr);S1+=c.rr;S2+=c.rr*c.rr});
     /* решаем π·Σ(r0+k·q)² = 0.6·W·H относительно k */
     const T=FILL*W*(H-BTOP)/Math.PI,n=a.length,qa=S2,qb=2*r0*S1,qc=n*r0*r0-T;
     let k=qa>0?(-qb+Math.sqrt(Math.max(0,qb*qb-4*qa*qc)))/(2*qa):0;if(mx>0)k=Math.min(k,(rmax-r0)/mx);
