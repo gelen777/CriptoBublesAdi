@@ -666,12 +666,25 @@ function tickBubbles(){
     case 'mcap':return lm(c.mc,LM.mc);
     case 'vol':return lm(c.vol,LM.vol);
     default:return Math.min(Math.abs(c.ch)/pmax,1)}};
-  const pf=!['rank','mcap','vol'].includes(cf.size);
-  let A=0;a.forEach(c=>{c.rr=pf?Math.pow(.02+met(c),.8)*3:1+2.2*met(c);A+=Math.PI*c.rr*c.rr});
-  const rmax=Math.min(W,H)*.3,rmin=Math.min(Math.max(7,Math.min(W,H)*.017),Math.sqrt(.3*W*H/(a.length*Math.PI)));
-  let s=Math.sqrt(.62*W*H/A);
-  for(let k=0;k<3;k++){let t=0;a.forEach(c=>{const r=Math.min(rmax,Math.max(rmin,c.rr*s));t+=Math.PI*r*r});if(t>.7*W*H)s*=Math.sqrt(.7*W*H/t);else break}
-  const rsig=Math.min(W,H)*.065;a.forEach(c=>{c.r+=(Math.max(sigOf(c)?rsig:0,Math.min(rmax,Math.max(rmin,c.rr*s)))-c.r)*.08;if(c!==(grab&&grab.c)){c.vx+=(W/2-c.x)/W*.12+(Math.random()-.5)*.04;c.vy+=(H/2-c.y)/H*.12+(Math.random()-.5)*.04}});
+  const pf=!['rank','mcap','vol'].includes(cf.size),rmax=Math.min(W,H)*.3;
+  if(pf){
+    /* «Производительность»: ПЛОЩАДЬ пузыря пропорциональна |%|  (10% = вдвое больше 5%).
+       r = r0 + k·√|%| — маленькая база r0, чтобы монеты около 0% было видно, порядок размеров всегда совпадает с порядком %.
+       Масштаб k общий для всех: заполняем ~60% экрана, самый большой пузырь не больше rmax (без обрезки отдельных пузырей). */
+    const r0=Math.max(4,Math.min(W,H)*.012);let mx=0,S2=0,S1=0;
+    a.forEach(c=>{c.rr=Math.sqrt(Math.abs(c.ch));mx=Math.max(mx,c.rr);S1+=c.rr;S2+=c.rr*c.rr});
+    /* решаем π·Σ(r0+k·q)² = 0.6·W·H относительно k */
+    const T=.6*W*H/Math.PI,n=a.length,qa=S2,qb=2*r0*S1,qc=n*r0*r0-T;
+    let k=qa>0?(-qb+Math.sqrt(Math.max(0,qb*qb-4*qa*qc)))/(2*qa):0;if(mx>0)k=Math.min(k,(rmax-r0)/mx);
+    a.forEach(c=>{c.tr=r0+k*c.rr});
+  }else{
+    let A=0;a.forEach(c=>{c.rr=1+2.2*met(c);A+=Math.PI*c.rr*c.rr});
+    const rmin=Math.min(Math.max(7,Math.min(W,H)*.017),Math.sqrt(.3*W*H/(a.length*Math.PI)));
+    let s=Math.sqrt(.62*W*H/A);
+    for(let k=0;k<3;k++){let t=0;a.forEach(c=>{const r=Math.min(rmax,Math.max(rmin,c.rr*s));t+=Math.PI*r*r});if(t>.7*W*H)s*=Math.sqrt(.7*W*H/t);else break}
+    a.forEach(c=>{c.tr=Math.min(rmax,Math.max(rmin,c.rr*s))});
+  }
+  a.forEach(c=>{c.r+=(c.tr-c.r)*.12;if(c!==(grab&&grab.c)){c.vx+=(W/2-c.x)/W*.12+(Math.random()-.5)*.04;c.vy+=(H/2-c.y)/H*.12+(Math.random()-.5)*.04}});
   const cs=Math.max(20,2*Math.max(...a.map(c=>c.r))+2),g=new Map();
   a.forEach(c=>{const k=Math.floor(c.x/cs)+','+Math.floor(c.y/cs);let l=g.get(k);if(!l){l=[];g.set(k,l)}l.push(c)});
   a.forEach(p=>{const cx=Math.floor(p.x/cs),cy=Math.floor(p.y/cs);
