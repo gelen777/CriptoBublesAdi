@@ -297,7 +297,7 @@ function mkApi(url){
     if(w&&w.readyState<=1)return w;
     const s=new WebSocket(url);w=s;s._l=Date.now();
     s.onopen=()=>{q.splice(0).forEach(m=>s.send(m))};
-    s.onmessage=e=>{s._l=Date.now();const m=JSON.parse(e.data),p=P.get(m.id);if(!p)return;P.delete(m.id);clearTimeout(p.t);m.status===200?p.ok(m.result):p.no(new Error('ws '+m.status))};
+    s.onmessage=e=>{s._l=Date.now();const m=JSON.parse(e.data),p=P.get(m.id);if(!p)return;P.delete(m.id);clearTimeout(p.t);m.status===200?p.ok(m.result):p.no(new Error('ws '+m.status+(m.error?' '+m.error.code+' '+m.error.msg:'')))};
     s.onclose=s.onerror=()=>reset(s);
     return s;
   };
@@ -328,6 +328,7 @@ async function viaWs(path){
   });
   if(n==='/api/v3/klines')return (q.endTime||+q.limit>=400?wsaDep:wsaCall)('klines',Object.assign({symbol:q.symbol,interval:q.interval,limit:+q.limit},q.endTime?{endTime:+q.endTime}:{}),6000);
   if(n==='/api/v3/depth')return wsaDep('depth',{symbol:q.symbol,limit:+q.limit},10000);
+  if(n==='/api/v3/ticker/price')return wsaBig('ticker.price',{},10000);
   if(n==='/api/v3/ticker')return (q.symbol?wsaCall:wsaDep)('ticker',Object.assign(q.symbols?{symbols:JSON.parse(q.symbols)}:{symbol:q.symbol},{windowSize:q.windowSize}),10000);
   throw new Error('no ws route');
 }
@@ -355,25 +356,28 @@ async function bj(path){
       if(r&&r.status>=400&&r.status<500&&r.status!==403&&r.status!==418&&r.status!==429){hi=h;throw new Error('http '+r.status)}}
     useWs=true;
   }
-  try{return await viaWs(path)}catch(e){throw new Error('net')}
+  try{return await viaWs(path)}catch(e){const t=String(e&&e.message||'');throw new Error(/ws 4\d\d/.test(t)?'http 400 '+t:'net')}
 }
-let fRestBad=0,nHost=null;
+let fRestBad=0,nHost=null,fProbing=false;
 /* запрос через само приложение (Android): без ограничений браузера, пробует несколько адресов Binance */
 const NR=new Map();let nrN=0;
 window.__nr=(id,code,txt)=>{const p=NR.get(id);if(!p)return;NR.delete(id);clearTimeout(p.t);code>=200&&code<300?p.ok(txt):p.no(new Error('http '+code))};
-const nget=(url,ms)=>new Promise((ok,no)=>{const id=++nrN;NR.set(id,{ok,no,t:setTimeout(()=>{NR.delete(id);no(new Error('timeout'))},ms*3+1000)});try{Android.get(id,url,ms)}catch(e){NR.delete(id);no(e)}});
+const nget=(url,ms)=>new Promise((ok,no)=>{const id=++nrN;NR.set(id,{ok,no,t:setTimeout(()=>{NR.delete(id);no(new Error('timeout'))},ms*2+500)});try{Android.get(id,url,ms)}catch(e){NR.delete(id);no(e)}});
 const HFN=HF.concat(['https://fapi3.binance.com','https://www.binance.com']);
 async function nativeF(path){
   if(!(window.Android&&Android.get))throw new Error('no native');
-  if(nHost)try{return JSON.parse(await nget(nHost+path,5000))}catch(e){nHost=null}
-  return await Promise.any(HFN.map(async h=>{const r=JSON.parse(await nget(h+path,6000));if(r&&r.code&&r.msg)throw new Error(r.msg);if(!nHost)nHost=h;return r}));
+  if(nHost)try{return JSON.parse(await nget(nHost+path,3500))}catch(e){nHost=null}
+  return await Promise.any(HFN.map(async h=>{const r=JSON.parse(await nget(h+path,4000));if(r&&r.code&&r.msg)throw new Error(r.msg);if(!nHost)nHost=h;return r}));
 }
 async function bjf(path,restOnly){
-  if(!useWsF||restOnly||Date.now()-fRestBad>90000){
+  const probe=useWsF&&!restOnly&&Date.now()-fRestBad>90000&&!fProbing;   /* раз в 90 сек проверяет только ОДИН запрос */
+  if(!useWsF||restOnly||probe){
+    if(probe)fProbing=true;
     try{const r=await Promise.any(HF.map(async h=>{const c=new AbortController(),t=setTimeout(()=>c.abort(),4000);try{const r=await fetch(h+path,{signal:c.signal});if(!r.ok)throw 0;return await r.json()}finally{clearTimeout(t)}}));useWsF=false;return r}
     catch(e){
       try{const r=await nativeF(path);useWsF=false;return r}catch(e2){}
       fRestBad=Date.now();if(restOnly)throw new Error('net');useWsF=true}
+    finally{if(probe)fProbing=false}
   }
   else if(/klines|ticker\/24hr/.test(path)&&window.Android&&Android.get){try{return await nativeF(path)}catch(e){}}
   try{return await viaWsF(path)}catch(e){throw new Error('net')}
@@ -575,6 +579,17 @@ async function rollBatch(syms,ws){ /* пакет с делением попол�
   catch(e){const bad=/http 4|nvalid symbol|-1121|-1100/.test(String(e&&e.message||e));
     if(!bad)throw e;                                        /* нет связи — не дробим (раньше это тянулось десятки минут) */
     if(syms.length<=3)return [];const h=syms.length>>1;return (await rollBatch(syms.slice(0,h),ws)).concat(await rollBatch(syms.slice(h),ws))}}
+/* список спот-пар Binance (на день): фьючерсы берут % у спот-пары, и в пачку должны попадать только существующие пары */
+let SPOTSET=null,spotLd=null;
+function spotSet(){
+  if(SPOTSET)return Promise.resolve(SPOTSET);
+  const o=LS.get('cbSpotSyms',null);if(o&&Date.now()-o.t<864e5&&o.l&&o.l.length>100){SPOTSET=new Set(o.l);return Promise.resolve(SPOTSET)}
+  if(AS.mkt==='spot'&&coins.size>100){SPOTSET=new Set(coins.keys());return Promise.resolve(SPOTSET)}
+  if(!spotLd)spotLd=Promise.race([bj('/api/v3/ticker/price'),new Promise((_,no)=>setTimeout(()=>no(new Error('t')),12000))])
+    .then(r=>{const l=(r||[]).map(x=>x.symbol).filter(Boolean);if(l.length>100){SPOTSET=new Set(l);LS.set('cbSpotSyms',{t:Date.now(),l})}return SPOTSET})
+    .catch(()=>null).finally(()=>{spotLd=null});
+  return spotLd;
+}
 let baseRun=null,baseErr=0;const BST={per:'',ok:0,tot:0};
 function baseProg(per,w){BST.ok=VIS.filter(c=>c.bp===per||(w&&rwPct(c,w)!=null)).length;updHint()}
 async function ensureBase(){
@@ -588,12 +603,13 @@ async function ensureBase(){
     /* пакетные скользящие окна (спот и фьючерсы через спот-пару) */
     const WS={m1:'1m',m5:'5m',m15:'15m',h1:'1h',h4:'4h',w1:'7d'}[cf.per];
     if(WS&&need.length){
-      const map=new Map();need.forEach(c=>{const [ss,f]=mk0==='fut'?FSP(c.s):[c.s,1];map.set(c,[ss,f])});
+      const SP=mk0==='fut'?await spotSet():null;
+      const map=new Map();need.forEach(c=>{const [ss,f]=mk0==='fut'?FSP(c.s):[c.s,1];if(SP&&!SP.has(ss))return;map.set(c,[ss,f])});
       const syms=[...new Set([...map.values()].map(x=>x[0]))];
       for(let i=0;i<syms.length;i+=100){if(my!==baseTok)return;
         let r;try{r=await rollBatch(syms.slice(i,i+100),WS)}catch(e){break}
         const m=new Map(r.map(x=>[x.symbol,x]));
-        need.forEach(c=>{const [ss,f]=map.get(c),x=m.get(ss);if(!x||!+x.openPrice)return;
+        need.forEach(c=>{const e=map.get(c);if(!e)return;const [ss,f]=e,x=m.get(ss);if(!x||!+x.openPrice)return;
           if(mk0==='fut'&&c.p&&Math.abs(+x.lastPrice*f/c.p-1)>.03)return;        /* спот-пара — другая монета */
           c.base=c.p/(+x.lastPrice/+x.openPrice);c.bp=cf.per;c.bt=Date.now();c.kf=0});baseProg(cf.per,RWW)}
       need=need.filter(c=>c.bp!==cf.per||(P.live&&Date.now()-c.bt>60000));
@@ -602,7 +618,7 @@ async function ensureBase(){
     let idx=0;const work=async()=>{while(idx<need.length&&my===baseTok){const c=need[idx++];
       try{const k=await apiK(mk0,c.s,iv,lim);if(k&&k.length){c.base=+k[0][1];c.bp=cf.per;c.bt=Date.now();c.kf=0}else c.kf=Date.now()}catch(e){c.kf=Date.now();baseErr++}
       if(idx%20===0)baseProg(cf.per,RWW)}};
-    await Promise.all(Array.from({length:8},work));
+    await Promise.all(Array.from({length:10},work));
   }finally{if(baseRun===key)baseRun=null;baseProg(cf.per,RWW)}
 }
 function updHint(){if(!coins.size)return;const cp=cfg().per,ld=PER[cp].b&&BST.per===cp&&BST.ok<VIS.length*.9?' · загружено '+BST.ok+'/'+VIS.length:'';const t='Binance '+(AS.mkt==='fut'?'Фьючерсы':'Спот')+' · '+PER[cp].l+' · '+VIS.length+' монет'+ld+(AS.sort!=='all'?' · список':''),h=$('#hint');if(h.textContent!==t)h.textContent=t}
