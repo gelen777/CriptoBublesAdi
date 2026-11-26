@@ -807,16 +807,19 @@ function tickBubbles(){
     bx.save();bx.translate(c.x,c.y);if(dm>.004){bx.rotate(dth);bx.scale(dk,1/dk);bx.rotate(-dth)}
     /* как в Crypto Bubbles: тёмная серединка, цвет собирается к краю; чем активнее монета (больше |%|),
        тем ярче и толще обводка и сильнее свечение вокруг */
-    const act=c.act||0;
+    /* яркость: активные — ярко (как раньше); неактивные — мутные, тёмные, еле заметная обводка
+       (чуть ярче, если всё-таки немного двигаются) — как в Crypto Bubbles */
+    const act=c.act||0,lv=act>0?.45+.55*act:.3*Math.min(1,Math.abs(c.ch)/(pmed*3));
     const gr=bx.createRadialGradient(0,0,r*.35,0,0,r);
-    gr.addColorStop(0,'rgba('+rgb+','+(.03+.05*act)+')');gr.addColorStop(.75,'rgba('+rgb+','+(.1+.16*act)+')');gr.addColorStop(1,'rgba('+rgb+','+(.32+.38*act)+')');
+    gr.addColorStop(0,'rgba('+rgb+','+(.015+.06*lv)+')');gr.addColorStop(.75,'rgba('+rgb+','+(.04+.2*lv)+')');gr.addColorStop(1,'rgba('+rgb+','+(.12+.55*lv)+')');
     bx.beginPath();bx.arc(0,0,r,0,6.2832);bx.fillStyle=gr;bx.fill();
     if(act>.45){const gw=Math.max(1.5,r*.05),pl=act>.9?.75+.25*Math.sin(now/260+c.ph):1;
       for(let i=1;i<=3;i++){bx.strokeStyle='rgba('+rgb+','+((act-.4)*.5/i*pl)+')';bx.lineWidth=gw;bx.beginPath();bx.arc(0,0,r+gw*(i-.4),0,6.2832);bx.stroke()}}
     bx.beginPath();bx.arc(0,0,r,0,6.2832);
-    bx.strokeStyle='rgba('+rgb+','+(.3+.7*act)+')';bx.lineWidth=Math.max(1.2,r*(.025+.055*act));bx.stroke();
+    bx.strokeStyle='rgba('+rgb+','+(.14+.86*lv)+')';bx.lineWidth=Math.max(1,r*(.018+.06*lv));bx.stroke();
     if(c===G){bx.strokeStyle='rgba('+rgb+',.28)';bx.lineWidth=Math.max(2,r*.09);bx.beginPath();bx.arc(0,0,r*1.07,0,6.2832);bx.stroke()}
-    if(r>=6){bx.globalAlpha=.55;bx.drawImage(BHL,-r,-r,r*2,r*2);bx.globalAlpha=1}
+    if(r>=6){bx.globalAlpha=.18+.45*lv;bx.drawImage(BHL,-r,-r,r*2,r*2);bx.globalAlpha=1}
+    c._lv=lv;
     bx.restore();
     if(isNew(c)){bx.fillStyle='#ffd54f';
       if(r<16){bx.beginPath();bx.arc(c.x+r*.72,c.y-r*.72,3.5,0,6.2832);bx.fill()}
