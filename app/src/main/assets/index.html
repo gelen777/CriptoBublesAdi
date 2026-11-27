@@ -1210,7 +1210,7 @@ async function openBrk(sym){
 /* режим «🎯 Топ пробоев» в пузырях: держим результаты свежими */
 setInterval(()=>{if(AS.sort==='brk'&&!BRK.busy&&coins.size>20&&(BRK.mk!==AS.mkt||Date.now()-BRK.t>300000))brkScan()},20000);
 /* ---------- список монет справа — как список рынков в приложении Binance ---------- */
-let blTab=LS.get('cbBlT','all'),blSort=LS.get('cbBlS','ch'),blDir=LS.get('cbBlD',-1),blQ='';
+let blTab=LS.get('cbBlT','all');if(!['all','brk','fav'].includes(blTab))blTab='all';let blSort=LS.get('cbBlS','ch'),blDir=LS.get('cbBlD',-1),blQ='';
 const ch24=c=>c.o?(c.p/c.o-1)*100:0;
 const fVolRu=v=>v>=1e9?cm((v/1e9).toFixed(2))+' млрд':v>=1e6?cm((v/1e6).toFixed(2))+' млн':v>=1e3?cm((v/1e3).toFixed(2))+' тыс':cm(String(Math.round(v)));
 const fPr=p=>cm(String(+(+p).toPrecision(p>=1000?7:p>=1?5:4)));
@@ -1244,7 +1244,7 @@ function listLogo(c){
 function renderBL(){
   const el=$('#blist');if(!el||el.classList.contains('off'))return;
   if(!el._k){el._k=1;el.innerHTML='<div class="bs"><input id="blq" placeholder="🔍 Поиск" autocomplete="off"><button class="bx" title="Закрыть список">✕</button></div>'
-    +'<div class="bh">'+[['all','Все'],['brk','🎯 Пробои'],['new','Новое'],['fav','Избранное'],['crypto','Crypto'],['tradfi','TradFi']].map(([k,l])=>'<button data-t="'+k+'">'+l+'</button>').join('')+'</div>'
+    +'<div class="bh">'+[['all','Все'],['brk','🎯 Пробои'],['fav','Избранное']].map(([k,l])=>'<button data-t="'+k+'">'+l+'</button>').join('')+'</div>'
     +'<div class="bq"><span></span><button class="bqx">✕ Сбросить поиск</button></div><div class="bsort"><span><span data-o="name">Название</span> / <span data-o="vol">Объём</span></span><span><span data-o="price">Цена</span> / <span data-o="ch">Изм. 24ч</span></span></div><div class="bl"></div>';
     $('#blq').oninput=e=>{blQ=e.target.value;renderBL()}}
   el.querySelectorAll('.bh [data-t]').forEach(b=>b.classList.toggle('on',b.dataset.t===blTab));
