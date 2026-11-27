@@ -2130,7 +2130,10 @@ function finishD(){
   DR.push(d);pend=[];hov=null;selD=DR.length-1;saveDR();tool='cur';renderDBar();ctxShow();
 }
 {const M=$('#main');
+  /* касания по панели рисунка и окну настроек — не график: не снимаем выделение и не рисуем */
+  const onUi=e=>e.target&&e.target.closest&&e.target.closest('#dctx,#dset');
   M.addEventListener('pointerdown',e=>{
+    if(onUi(e))return;
     if(!chart||!series||S.view==='tv'||!candles.length)return;const P=evPt(e);if(P.t==null||P.v==null)return;
     if(tool!=='cur'){e.stopPropagation();e.preventDefault();
       const Q=snapPt(P);if(tool==='ruler'){ruler={a:Q,b:Q,live:1};return}
@@ -2140,6 +2143,7 @@ function finishD(){
     else if(selD>=0){selD=-1;renderDBar();ctxShow()}
   },true);
   M.addEventListener('pointermove',e=>{
+    if(onUi(e))return;
     if(!chart||!series||!candles.length)return;
     if(tool==='ruler'&&ruler&&ruler.live){ruler.b=snapPt(evPt(e));e.stopPropagation();return}
     if(tool!=='cur'&&pend.length){const P=snapPt(evPt(e));if(P.t!=null&&P.v!=null)hov={t:P.t,v:P.v};e.stopPropagation();e.preventDefault();return}
@@ -2151,6 +2155,7 @@ function finishD(){
         if(drag.hp===1)D.p[2]={t:D.p[1].t,v:D.p[2].v};else if(drag.hp===2)D.p[1]={t:D.p[2].t,v:D.p[1].v};else if(drag.hp===0){D.p[1]={t:drag.orig[1].t,v:drag.orig[1].v};D.p[2]={t:drag.orig[2].t,v:drag.orig[2].v}}}}
   },true);
   const up=e=>{
+    if(onUi(e))return;
     if(tool==='ruler'&&ruler&&ruler.live){ruler.live=0;e.stopPropagation();return}
     if(tool!=='cur'&&pend.length===1&&NPT[tool]>=2&&pdown){const P=snapPt(evPt(e));if(P.t!=null&&P.v!=null&&Math.hypot(P.x-pdown.x,P.y-pdown.y)>10){pend.push({t:P.t,v:P.v});if(pend.length>=NPT[tool])finishD()}e.stopPropagation();return}
     if(drag){drag=null;saveDR();e.stopPropagation()}
