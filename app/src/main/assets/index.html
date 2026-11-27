@@ -1074,7 +1074,9 @@ async function fullList(mk){
   if(!a||a.length<300){try{put(await accumMini('wss://stream.binance.com:9443/ws/!miniTicker@arr',10000,0))}catch(e){}}
   put(a);return {d:[...m.values()],syms:[...m.keys()]};
 }
-async function refreshCoins(btn){
+let rfBusy=false;
+async function refreshCoins(btn,quiet){
+  if(rfBusy)return;rfBusy=true;try{
   if(btn){btn.disabled=true;btn.textContent='⏳ Загружаю списки Binance…'}
   const mk=AS.mkt,other=mk==='fut'?'spot':'fut',before=coins.size;
   const [cur0,oth]=await Promise.all([fullList(mk),fullList(other)]);
@@ -1084,9 +1086,15 @@ async function refreshCoins(btn){
   learnSyms(cur0.syms,mk,vm);learnSyms(oth.syms,other,null);
   visT=0;LS.set('cbRf',Date.now());
   const msg='Готово: '+(mk==='fut'?'фьючерсы':'спот')+' '+cur0.syms.length+' пар, '+(other==='fut'?'фьючерсы':'спот')+' '+oth.syms.length+' пар · добавлено новых монет: '+added;
-  toast('🔄 '+msg);
-  if(btn&&btn.isConnected){btn.disabled=false;btn.textContent='🔄 Обновить монеты'}const st=$('#rfst');if(st)st.textContent=msg;
+  if(!quiet||added)toast('🔄 '+(quiet?'Автообновление: новых монет '+added:msg));
+  const st=$('#rfst');if(st)st.textContent=msg;
+  }catch(e){}finally{rfBusy=false;if(btn&&btn.isConnected){btn.disabled=false;btn.textContent='🔄 Обновить монеты'}}
 }
+/* автообновление списка монет: через 20 сек после запуска (если давно не обновлялось) и дальше по интервалу */
+const RFI={0:0,15:9e5,30:18e5,60:36e5,240:144e5};
+let rfTry=0;
+function rfAuto(){const m=AS.rfa==null?30:AS.rfa;if(!m||!coins.size||document.hidden||rfBusy||Date.now()-rfTry<3e5)return;if(Date.now()-LS.get('cbRf',0)>=RFI[m]){rfTry=Date.now();refreshCoins(null,true)}}   /* неудача — повтор не раньше чем через 5 мин */
+setTimeout(rfAuto,20000);setInterval(rfAuto,60000);
 /* ================= 🎯 СКАНЕР ПРОБОЕВ =================
    Анализирует самые ликвидные монеты рынка и ищет те, что ближе всего к пробою уровня.
    Учитывает: близость цены к уровню (в ATR), число касаний уровня, фигуры теханализа
@@ -1338,7 +1346,7 @@ function renderSet(){
    +'<div class="row"><span>Цвета</span><select id="scol">'+Object.keys(SCH).map(k=>'<option value="'+k+'"'+(AS.colors===k?' selected':'')+'>'+SCH[k].n+'</option>').join('')+'</select></div>'
    +'<div class="row"><span>Тема</span><span><button class="chip'+(AS.theme===1?' on':'')+'" data-th="1">Тёмная</button> <button class="chip'+(AS.theme===2?' on':'')+'" data-th="2">Чёрная</button></span></div>'
    +'<div class="h3">Обновление приложения</div><div class="row"><span id="updst">'+(window.Android?(updReady?'Обновление скачано — нажмите «Применить»':'Приложение само проверяет обновления при запуске'):'Доступно в приложении на телефоне')+'</span><span><button id="updchk">🔄 Проверить</button> <button id="updgo" style="'+(updReady?'':'display:none')+'">⬆ Применить</button></span></div>'
-   +'<div class="h3">Монеты Binance</div><div class="row"><span>Загрузить свежий список монет спота и фьючерсов — новые сразу появятся в пузырях</span><button id="rfc">🔄 Обновить монеты</button></div><div class="row"><small id="rfst" style="color:#8b93a7">'+(LS.get('cbRf',0)?'Последнее обновление: '+new Date(LS.get('cbRf',0)).toLocaleString('ru-RU'):'Ещё не обновлялось')+' · всего монет сейчас: '+coins.size+'. Чтобы видеть все, выберите «Монет: Все» в настройках пузырей (✎).</small></div>'
+   +'<div class="h3">Монеты Binance</div><div class="row"><span>Загрузить свежий список монет спота и фьючерсов — новые сразу появятся в пузырях</span><button id="rfc">🔄 Обновить монеты</button></div><div class="row" style="flex-direction:column;align-items:flex-start;gap:6px"><span>Автообновление списка монет</span><span style="display:flex;gap:6px;flex-wrap:wrap">'+[[0,'Выкл'],[15,'15 мин'],[30,'30 мин'],[60,'1 ч'],[240,'4 ч']].map(([v,l])=>'<button class="chip'+((AS.rfa==null?30:AS.rfa)===v?' on':'')+'" data-rfa="'+v+'">'+l+'</button>').join(' ')+'</span></div><div class="row"><small id="rfst" style="color:#8b93a7">'+(LS.get('cbRf',0)?'Последнее обновление: '+new Date(LS.get('cbRf',0)).toLocaleString('ru-RU'):'Ещё не обновлялось')+' · всего монет сейчас: '+coins.size+'. Чтобы видеть все, выберите «Монет: Все» в настройках пузырей (✎).</small></div>'
    +'<div class="h3">Новости</div><div class="row"><span>Подсветка монет (КУПИТЬ / ПРОДАТЬ)</span><span><button class="chip'+(AS.news!==0?' on':'')+'" data-nw="1">Вкл</button> <button class="chip'+(AS.news===0?' on':'')+'" data-nw="0">Выкл</button></span></div>'
    +'<div class="row"><span>Всплывающие срочные новости</span><span><button class="chip'+(AS.ntoast!==0?' on':'')+'" data-nt="1">Вкл</button> <button class="chip'+(AS.ntoast===0?' on':'')+'" data-nt="0">Выкл</button></span></div>'
    +'<div class="row"><span>Учитывать новости важностью от</span><select id="snimp">'+[[1.5,'★★ (больше новостей)'],[2.5,'★★★ (обычно)'],[3.5,'★★★★ (только крупные)']].map(([v,l])=>'<option value="'+v+'"'+((AS.nimp||2.5)==v?' selected':'')+'>'+l+'</option>').join('')+'</select></div>'
@@ -1354,6 +1362,7 @@ $('#spanel').onclick=e=>{
   if(b.id==='sx')$('#spanel').style.display='none';
   else if(b.dataset.th){AS.theme=+b.dataset.th;applyCfg(true);renderSet()}
   else if(b.id==='rfc'){refreshCoins(b)}
+  else if(b.dataset.rfa!=null){AS.rfa=+b.dataset.rfa;saveAll();b.parentNode.querySelectorAll('[data-rfa]').forEach(x=>x.classList.toggle('on',x===b));toast(AS.rfa?'Монеты будут обновляться каждые '+b.textContent:'Автообновление монет выключено');rfAuto()}
   else if(b.id==='updchk'){if(window.Android){$('#updst').textContent='Проверяю…';Android.check()}else toast('Проверка обновлений работает в приложении на телефоне')}
   else if(b.id==='updgo'){if(window.Android)Android.reload()}
   else if(b.dataset.nw){AS.news=+b.dataset.nw;saveAll();renderSet()}
