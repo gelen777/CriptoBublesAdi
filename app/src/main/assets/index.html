@@ -1960,15 +1960,18 @@ function drawPats(w,h,right){
   const fiEnd=N-1+Math.max(0,(A[an-1].t-PS[N-1].t)/ptS),T=fi=>fi<=N-1?PS[Math.round(fi)].t:PS[N-1].t+(fi-(N-1))*ptS,X=i=>tX(T(i===N-1?fiEnd:i));
   const tfl=patTf()===S.tf?'':'['+TFL[patTf()]+'] ';
   ox.save();ox.font='600 11px system-ui';ox.textBaseline='middle';
+  /* рисуем только внутри области свечей: при прокрутке фигура уезжает вместе с графиком, а не прижимается к краю */
+  ox.save();ox.beginPath();ox.rect(0,0,right,h);ox.clip();
   PATS.forEach(P=>{
     const col=P.col;ox.strokeStyle=`rgba(${col},.95)`;ox.lineWidth=2;ox.setLineDash(P.dash?[7,5]:[]);
-    (P.lines||[]).forEach(([i1,p1,i2,p2])=>{if(i2===N-1&&i2>i1){p2=p1+(p2-p1)/(i2-i1)*(fiEnd-i1)}const x1=X(i1),x2=X(i2),y1=Y(p1),y2=Y(p2);if(x1==null||x2==null||y1==null||y2==null)return;ox.beginPath();ox.moveTo(x1,y1);ox.lineTo(Math.min(x2,right),y2);ox.stroke()});
+    (P.lines||[]).forEach(([i1,p1,i2,p2])=>{if(i2===N-1&&i2>i1){p2=p1+(p2-p1)/(i2-i1)*(fiEnd-i1)}const x1=X(i1),x2=X(i2),y1=Y(p1),y2=Y(p2);if(x1==null||x2==null||y1==null||y2==null)return;ox.beginPath();ox.moveTo(x1,y1);ox.lineTo(x2,y2);ox.stroke()});
     ox.setLineDash([]);
-    if(P.box){const [i1,i2,lo,hi]=P.box,x1=X(i1),x2=X(i2),y1=Y(hi),y2=Y(lo);if(x1!=null&&x2!=null&&y1!=null&&y2!=null){ox.fillStyle=`rgba(${col},.10)`;ox.fillRect(x1,y1,Math.min(x2,right)-x1,y2-y1);ox.strokeStyle=`rgba(${col},.8)`;ox.lineWidth=1.2;ox.strokeRect(x1,y1,Math.min(x2,right)-x1,y2-y1)}}
+    if(P.box){const [i1,i2,lo,hi]=P.box,x1=X(i1),x2=X(i2),y1=Y(hi),y2=Y(lo);if(x1!=null&&x2!=null&&y1!=null&&y2!=null){ox.fillStyle=`rgba(${col},.10)`;ox.fillRect(x1,y1,x2-x1,y2-y1);ox.strokeStyle=`rgba(${col},.8)`;ox.lineWidth=1.2;ox.strokeRect(x1,y1,x2-x1,y2-y1)}}
     if(P.cup){const [a,ap,b,bp,r,rp]=P.cup,xa=X(a),xb=X(b),xr=X(r),ya=Y(ap),yb=Y(bp),yr=Y(rp);if([xa,xb,xr,ya,yb,yr].every(v=>v!=null)){ox.strokeStyle=`rgba(${col},.95)`;ox.lineWidth=2.5;ox.beginPath();ox.moveTo(xa,ya);ox.bezierCurveTo(xa+(xb-xa)*.35,yb+(yb-ya)*.25,xb-(xb-xa)*.3,yb,xb,yb);ox.bezierCurveTo(xb+(xr-xb)*.3,yb,xr-(xr-xb)*.35,yb+(yb-yr)*.25,xr,yr);ox.stroke()}}
     if(P.pts)P.pts.forEach(q=>{const x=X(q.i),y=Y(q.p);if(x==null||y==null)return;ox.fillStyle=`rgba(${col},1)`;ox.beginPath();ox.arc(x,y,4,0,6.2832);ox.fill()});
-    const L=P.lab;if(L){const x=X(L.i),y=Y(L.p),ic=L.t.split(' ')[0];if(x!=null&&y!=null&&ic.length<=2){ox.fillStyle=`rgb(${col})`;ox.textAlign='center';ox.font='700 13px system-ui';ox.fillText(ic,Math.min(x,right-8),Math.max(10,y-12));ox.font='600 11px system-ui'}}
+    const L=P.lab;if(L){const x=X(L.i),y=Y(L.p),ic=L.t.split(' ')[0];if(x!=null&&y!=null&&ic.length<=2){ox.fillStyle=`rgb(${col})`;ox.textAlign='center';ox.font='700 13px system-ui';ox.fillText(ic,x,Math.max(10,y-12));ox.font='600 11px system-ui'}}
   });
+  ox.restore();
   /* список найденных фигур — внизу слева, чтобы подписи не налезали друг на друга */
   const nOsc=IS.filter(o=>IDEF[o.d.k]&&IDEF[o.d.k].osc).length;let yy=h*(nOsc?(.9-.14*nOsc):.8)-14;ox.textAlign='left';
   PATS.slice().reverse().forEach(P=>{if(!P.lab)return;const t=tfl+P.lab.t,tw=ox.measureText(t).width+22;if(yy<20)return;
@@ -2154,7 +2157,7 @@ function drawD(w,h,right){
     if(sel){ox.fillStyle='#fff';ox.strokeStyle=d.c;ox.lineWidth=2;P.forEach(p=>{ox.beginPath();ox.arc(p.x,p.y,7,0,6.2832);ox.fill();ox.stroke()})}
     if(d.k==='tl'&&b){const v0=d.p[0].v,v1=d.p[1].v,pc=(v1/v0-1)*100,bars=Math.round((d.p[1].t-d.p[0].t)/barSec());pill([(pc>=0?'+':'')+pc.toFixed(2)+'% · '+bars+' свеч.'],b.x+10,b.y,'rgba(42,46,57,.92)','l')}
   };
-  ox.save();
+  ox.save();ox.beginPath();ox.rect(0,0,right,h);ox.clip();
   DR.forEach((d,i)=>one(d,i===selD));
   if(tool!=='cur'&&tool!=='ruler'&&pend.length&&hov){const pts=pend.concat([hov]).slice(0,NPT[tool]);one({k:tool,p:pts,c:dcol,w:dwid,txt:''},true)}
   if(ruler){const a=scr(ruler.a),b=scr(ruler.b);if(ruler.a.v!=null&&ruler.b.v!=null&&a.x!=null&&b.x!=null){const up=ruler.b.v>=ruler.a.v,col=up?'38,166,154':'239,83,80';
