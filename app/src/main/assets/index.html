@@ -63,7 +63,7 @@ button{cursor:pointer}
 #dbar{display:none;gap:4px;align-items:center;flex-wrap:wrap;padding:6px 8px;background:#0f131b;border-bottom:1px solid #1c2230}
 #dbar .dt{display:flex;flex-direction:column;align-items:center;min-width:46px;padding:4px 6px;font-size:16px;line-height:1.1}
 #dbar .dt small{font-size:9px;color:#8b93a7;margin-top:2px;max-width:76px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-#dbar .dt.on{background:#2a2e39;color:#2962ff}#dbar .dsep{width:1px;height:28px;background:#2a3142;margin:0 4px}#dbar input{width:110px}
+#dbar .dt.on{background:#2a2e39;color:#2962ff}#dbar .dpos{display:flex;align-items:center;gap:4px;font-size:11px;color:#8b93a7}#dbar .dpos input{width:70px}#dbar .dsep{width:1px;height:28px;background:#2a3142;margin:0 4px}#dbar input{width:110px}
 #dbar .dhint{color:#ffd54f;font-size:12px;flex-basis:100%}
 .dc{width:22px;height:22px;min-width:22px;border-radius:50%;border:2px solid #0f131b;padding:0}.dc.on{border-color:#fff}
 #ipanel{display:none;padding:8px 10px;background:#0f131b;border-bottom:1px solid #1c2230;max-height:50vh;overflow:auto}
@@ -1495,7 +1495,7 @@ async function openChart(sym,view){
       layout:{background:{color:'#131722'},textColor:'#d1d4dc',fontFamily:'-apple-system,BlinkMacSystemFont,Trebuchet MS,Roboto,sans-serif'},
       grid:{vertLines:{color:'rgba(42,46,57,.6)'},horzLines:{color:'rgba(42,46,57,.6)'}},
       rightPriceScale:{borderColor:'#2a2e39',scaleMargins:{top:.08,bottom:.22}},
-      localization:{locale:'ru-RU',timeFormatter:t=>{const d=new Date(t*1000),D=p2(d.getDate())+' '+MON[d.getMonth()]+" '"+String(d.getFullYear()).slice(2);return /^1[dw]$/.test(S.tf)?D:D+'  '+p2(d.getHours())+':'+p2(d.getMinutes())}},
+      localization:{locale:'ru-RU',priceFormatter:p=>p<0?'':(+p).toFixed(prec),timeFormatter:t=>{const d=new Date(t*1000),D=p2(d.getDate())+' '+MON[d.getMonth()]+" '"+String(d.getFullYear()).slice(2);return /^1[dw]$/.test(S.tf)?D:D+'  '+p2(d.getHours())+':'+p2(d.getMinutes())}},
       timeScale:{timeVisible:true,secondsVisible:false,borderColor:'#2a2e39',rightOffset:8,tickMarkFormatter:(t,k)=>{const d=new Date(t*1000);return k===0?String(d.getFullYear()):k===1?MON[d.getMonth()]:k===2?String(d.getDate()):p2(d.getHours())+':'+p2(d.getMinutes())}},
       crosshair:{mode:0,vertLine:{color:'#758696',style:3,labelBackgroundColor:'#2a2e39'},horzLine:{color:'#758696',style:3,labelBackgroundColor:'#2a2e39'}}});
     chartTheme();
@@ -1838,7 +1838,9 @@ $('#panel').addEventListener('click',e=>{const b=e.target.closest('button');if(!
 chartTheme();
 /* ---------- авто-фигуры теханализа ---------- */
 let PATS=[],patT=0,PSRC=null,PC=null,pcT=0,pcKey='';
-const patTf=()=>{const t=S.ptf||'4h';return t==='chart'?S.tf:t};
+/* фигуры не ищем на таймфрейме МЕНЬШЕ графика: на дневном фигуры с 4ч сжимаются и «прилипают» — тогда берём свечи самого графика */
+const TFO=['1m','3m','5m','15m','30m','1h','2h','4h','1d','1w'];
+const patTf=()=>{const t=S.ptf||'4h';return t==='chart'||TFO.indexOf(S.tf)>=TFO.indexOf(t)?S.tf:t};
 /* свечи для поиска фигур на старшем таймфрейме (обновляются раз в минуту) */
 let pcBusy=false;async function loadPC(){const tf=patTf();if(tf===S.tf){PC=null;return}if(pcBusy||!candles.length)return;const key=CM+cur+tf;if(key===pcKey&&Date.now()-pcT<60000)return;pcKey=key;pcT=Date.now();pcBusy=true;try{const k=await apiK(CM,cur,tf,500);if(key===pcKey)PC=k.map(r=>({t:r[0]/1000,h:+r[2],l:+r[3],c:+r[4]}))}catch(e){pcT=Date.now()-45000}finally{pcBusy=false}}
 function atrN(c,n){let s=0,k=0;for(let i=Math.max(1,c.length-n);i<c.length;i++){s+=Math.max(c[i].h-c[i].l,Math.abs(c[i].h-c[i-1].c),Math.abs(c[i].l-c[i-1].c));k++}return k?s/k:0}
@@ -2047,6 +2049,18 @@ const NPT={long:1,short:1,tl:2,ray:2,hl:1,vl:1,ch:3,rect:2,tri:3,fib:2,txt:1,rul
 const DCOL=['#2962ff','#ffd54f','#26a69a','#ef5350','#ab47bc','#ff9800','#ffffff'];
 const FIBL=[0,.236,.382,.5,.618,.786,1,1.618];
 let DR=[],tool='cur',pend=[],hov=null,selD=-1,drag=null,dcol='#2962ff',dwid=2,ruler=null,pdown=null;
+/* настройки позиции (депозит и риск на сделку) и магнит к свечам */
+const POS=Object.assign({dep:1000,risk:1,mag:true},LS.get('cbPos',{}));const savePos=()=>LS.set('cbPos',POS);
+/* магнит: точка прилипает к ближайшей цене свечи (открытие/макс/мин/закрытие), если палец рядом */
+function snapPt(P){if(!POS.mag||!series||!chart||P.t==null)return P;const l=chart.timeScale().coordinateToLogical(P.x);if(l==null)return P;const i=Math.round(l),k=candles[i];if(!k)return P;
+  let best=null,bd=16;[k.o,k.h,k.l,k.c].forEach(v=>{const y=series.priceToCoordinate(v);if(y!=null&&Math.abs(y-P.y)<bd){bd=Math.abs(y-P.y);best={v,y}}});
+  return best?{...P,v:best.v,y:best.y,t:k.t,x:chart.timeScale().logicalToCoordinate(i)}:P}
+const fmtDur=s=>{s=Math.abs(s);const d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);return d?d+'д '+(h?h+'ч':''):h?h+'ч '+(m?m+'м':''):m+'м'};
+const fmtUsd=v=>{const a=Math.abs(v);return (v<0?'−':'')+'$'+(a>=1e6?(a/1e6).toFixed(2)+'M':a>=1e3?(a/1e3).toFixed(1)+'K':a.toFixed(a>=100?0:2))};
+function pill(lines,x,y,bg,align){ox.font='600 11.5px system-ui';const lh=15,tw=Math.max(...lines.map(t=>ox.measureText(t).width))+14,th=lines.length*lh+6;
+  let px=align==='c'?x-tw/2:align==='r'?x-tw:x;const W=$('#main').clientWidth;px=Math.max(4,Math.min(px,W-tw-4));
+  ox.fillStyle=bg;ox.beginPath();ox.roundRect?ox.roundRect(px,y-th/2,tw,th,6):ox.rect(px,y-th/2,tw,th);ox.fill();
+  ox.fillStyle='#fff';ox.textAlign='left';ox.textBaseline='middle';lines.forEach((t,i)=>ox.fillText(t,px+7,y-th/2+3+lh/2+i*lh));return {x:px,w:tw,h:th}}
 const drKey=()=>'cbDr:'+CM+':'+cur;
 function loadDR(){try{DR=JSON.parse(localStorage.getItem(drKey())||'[]')}catch(e){DR=[]}selD=-1;pend=[];hov=null;ruler=null;renderDBar()}
 function saveDR(){try{localStorage.setItem(drKey(),JSON.stringify(DR))}catch(e){}}
@@ -2078,7 +2092,8 @@ function dSegs(d,P,w){
 function hitD(x,y){
   const w=$('#main').clientWidth;
   for(let i=DR.length-1;i>=0;i--){const d=DR[i],P=d.p.map(scr);
-    for(let j=0;j<P.length;j++)if(P[j].x!=null&&P[j].y!=null&&Math.hypot(P[j].x-x,P[j].y-y)<14)return {i,hp:j};
+    for(let j=0;j<P.length;j++)if(P[j].x!=null&&P[j].y!=null&&Math.hypot(P[j].x-x,P[j].y-y)<20)return {i,hp:j};
+    if(d.k==='long'||d.k==='short'){const xl=Math.min(P[0].x,P[1].x);if(Math.hypot(xl-x,P[1].y-y)<20)return {i,hp:1};if(Math.hypot(xl-x,P[2].y-y)<20)return {i,hp:2};if(Math.hypot(Math.max(P[0].x,P[1].x)-x,P[0].y-y)<20)return {i,hp:3}}   /* правый край — ширина позиции */
     if(d.k==='txt'&&P[0].x!=null&&x>=P[0].x-4&&x<=P[0].x+8*(d.txt||'').length+8&&Math.abs(y-P[0].y)<14)return {i,hp:-1};
     if(dSegs(d,P,w).some(([a,b])=>segD(x,y,a,b)<9))return {i,hp:-1};
   }
@@ -2096,23 +2111,26 @@ function finishD(){
   M.addEventListener('pointerdown',e=>{
     if(!chart||!series||S.view==='tv'||!candles.length)return;const P=evPt(e);if(P.t==null||P.v==null)return;
     if(tool!=='cur'){e.stopPropagation();e.preventDefault();
-      if(tool==='ruler'){ruler={a:P,b:P,live:1};return}
-      pend.push({t:P.t,v:P.v});hov={t:P.t,v:P.v};pdown=P;if(pend.length>=NPT[tool])finishD();return}
+      const Q=snapPt(P);if(tool==='ruler'){ruler={a:Q,b:Q,live:1};return}
+      pend.push({t:Q.t,v:Q.v});hov={t:Q.t,v:Q.v};pdown=P;if(pend.length>=NPT[tool])finishD();return}
     const h=hitD(P.x,P.y);
     if(h){e.stopPropagation();e.preventDefault();selD=h.i;drag={i:h.i,hp:h.hp,st:P,orig:JSON.parse(JSON.stringify(DR[h.i].p))};renderDBar()}
     else if(selD>=0){selD=-1;renderDBar()}
   },true);
   M.addEventListener('pointermove',e=>{
     if(!chart||!series||!candles.length)return;
-    if(tool==='ruler'&&ruler&&ruler.live){ruler.b=evPt(e);e.stopPropagation();return}
-    if(tool!=='cur'&&pend.length){const P=evPt(e);if(P.t!=null&&P.v!=null)hov={t:P.t,v:P.v};e.stopPropagation();e.preventDefault();return}
+    if(tool==='ruler'&&ruler&&ruler.live){ruler.b=snapPt(evPt(e));e.stopPropagation();return}
+    if(tool!=='cur'&&pend.length){const P=snapPt(evPt(e));if(P.t!=null&&P.v!=null)hov={t:P.t,v:P.v};e.stopPropagation();e.preventDefault();return}
     if(drag){e.stopPropagation();e.preventDefault();const P=evPt(e);if(P.t==null||P.v==null)return;const dt=P.t-drag.st.t,dv=P.v-drag.st.v;
       const D=DR[drag.i];D.p=drag.orig.map((q,j)=>drag.hp<0||drag.hp===j?{t:q.t+dt,v:q.v+dv}:q);
-      if(D.k==='long'||D.k==='short'){if(drag.hp===1)D.p[2]={t:D.p[1].t,v:D.p[2].v};else if(drag.hp===2)D.p[1]={t:D.p[2].t,v:D.p[1].v};else if(drag.hp===0){D.p[1]={t:drag.orig[1].t,v:drag.orig[1].v};D.p[2]={t:drag.orig[2].t,v:drag.orig[2].v}}}}
+      if(drag.hp>=0&&drag.hp<3&&D.k!=='long'&&D.k!=='short'){const S2=snapPt({x:P.x,y:P.y,t:drag.orig[drag.hp].t+dt,v:drag.orig[drag.hp].v+dv});D.p[drag.hp]={t:S2.t,v:S2.v}}
+      if(D.k==='long'||D.k==='short'){if(drag.hp===3){const t=drag.orig[1].t+dt;D.p=drag.orig.map(q=>({...q}));D.p[1].t=D.p[2].t=Math.max(drag.orig[0].t+barSec(),t)}
+        else if(drag.hp===0){const S2=snapPt(P);D.p[0]={t:drag.orig[0].t+dt,v:S2.v}}
+        if(drag.hp===1)D.p[2]={t:D.p[1].t,v:D.p[2].v};else if(drag.hp===2)D.p[1]={t:D.p[2].t,v:D.p[1].v};else if(drag.hp===0){D.p[1]={t:drag.orig[1].t,v:drag.orig[1].v};D.p[2]={t:drag.orig[2].t,v:drag.orig[2].v}}}}
   },true);
   const up=e=>{
     if(tool==='ruler'&&ruler&&ruler.live){ruler.live=0;e.stopPropagation();return}
-    if(tool!=='cur'&&pend.length===1&&NPT[tool]>=2&&pdown){const P=evPt(e);if(P.t!=null&&P.v!=null&&Math.hypot(P.x-pdown.x,P.y-pdown.y)>10){pend.push({t:P.t,v:P.v});if(pend.length>=NPT[tool])finishD()}e.stopPropagation();return}
+    if(tool!=='cur'&&pend.length===1&&NPT[tool]>=2&&pdown){const P=snapPt(evPt(e));if(P.t!=null&&P.v!=null&&Math.hypot(P.x-pdown.x,P.y-pdown.y)>10){pend.push({t:P.t,v:P.v});if(pend.length>=NPT[tool])finishD()}e.stopPropagation();return}
     if(drag){drag=null;saveDR();e.stopPropagation()}
   };
   M.addEventListener('pointerup',up,true);M.addEventListener('pointercancel',up,true);
@@ -2128,39 +2146,58 @@ function drawD(w,h,right){
     if(d.k==='ch'&&c){const o=c.y-(a.y+(b.y-a.y)*((c.x-a.x)/((b.x-a.x)||1e-9)));ox.globalAlpha=.12;ox.beginPath();ox.moveTo(a.x,a.y);ox.lineTo(b.x,b.y);ox.lineTo(b.x,b.y+o);ox.lineTo(a.x,a.y+o);ox.closePath();ox.fill();ox.globalAlpha=1}
     dSegs(d,P,right).forEach(([p,q])=>{ox.beginPath();ox.moveTo(p.x,p.y);ox.lineTo(q.x,Math.min(q.y,h));ox.stroke()});
     ox.font='600 11px system-ui';ox.textBaseline='middle';ox.textAlign='left';
-    if(d.k==='fib'&&b){FIBL.forEach(l=>{const v=d.p[1].v+(d.p[0].v-d.p[1].v)*l,y=b.y+(a.y-b.y)*l;ox.fillText(l+' ('+v.toFixed(prec)+')',Math.min(a.x,b.x)+4,y-8)})}
+    if(d.k==='fib'&&b){const FC=['120,123,134','239,83,80','255,152,0','76,175,80','38,166,154','41,98,255','120,123,134','171,71,188'],x0=Math.min(a.x,b.x);
+      FIBL.forEach((l,i)=>{const y=b.y+(a.y-b.y)*l;if(i<FIBL.length-1){const y2=b.y+(a.y-b.y)*FIBL[i+1];ox.fillStyle=`rgba(${FC[i]},.10)`;ox.fillRect(x0,Math.min(y,y2),right-x0,Math.abs(y2-y))}
+        const v=d.p[1].v+(d.p[0].v-d.p[1].v)*l;ox.strokeStyle=`rgb(${FC[i]})`;ox.lineWidth=1;ox.beginPath();ox.moveTo(x0,y);ox.lineTo(right,y);ox.stroke();ox.fillStyle=`rgb(${FC[i]})`;ox.fillText(l+' ('+v.toFixed(prec)+')',x0+4,y-8)});ox.strokeStyle=d.c}
     if(d.k==='hl'){const t=d.p[0].v.toFixed(prec),tw=ox.measureText(t).width+10;ox.fillRect(right-tw,a.y-9,tw,18);ox.fillStyle='#000';ox.fillText(t,right-tw+5,a.y)}
     if(d.k==='txt'){ox.font='600 14px system-ui';ox.fillText(d.txt||'Текст',a.x,a.y)}
-    if(sel){ox.fillStyle='#fff';ox.strokeStyle=d.c;ox.lineWidth=2;P.forEach(p=>{ox.beginPath();ox.arc(p.x,p.y,5,0,6.2832);ox.fill();ox.stroke()})}
+    if(sel){ox.fillStyle='#fff';ox.strokeStyle=d.c;ox.lineWidth=2;P.forEach(p=>{ox.beginPath();ox.arc(p.x,p.y,7,0,6.2832);ox.fill();ox.stroke()})}
+    if(d.k==='tl'&&b){const v0=d.p[0].v,v1=d.p[1].v,pc=(v1/v0-1)*100,bars=Math.round((d.p[1].t-d.p[0].t)/barSec());pill([(pc>=0?'+':'')+pc.toFixed(2)+'% · '+bars+' свеч.'],b.x+10,b.y,'rgba(42,46,57,.92)','l')}
   };
   ox.save();
   DR.forEach((d,i)=>one(d,i===selD));
   if(tool!=='cur'&&tool!=='ruler'&&pend.length&&hov){const pts=pend.concat([hov]).slice(0,NPT[tool]);one({k:tool,p:pts,c:dcol,w:dwid,txt:''},true)}
-  if(ruler){const a=ruler.a,b=ruler.b;if(a.v!=null&&b.v!=null){const up=b.v>=a.v,col=up?'38,166,154':'239,83,80';
-    ox.fillStyle=`rgba(${col},.18)`;ox.fillRect(Math.min(a.x,b.x),Math.min(a.y,b.y),Math.abs(b.x-a.x),Math.abs(b.y-a.y));
-    const bars=Math.round((b.t-a.t)/barSec()),pc=(b.v/a.v-1)*100,t=(b.v-a.v).toFixed(prec)+' ('+(pc>=0?'+':'')+pc.toFixed(2)+'%) · '+bars+' свеч.',tw=ox.measureText(t).width+12;
-    ox.fillStyle=`rgba(${col},.95)`;ox.fillRect(b.x-tw/2,b.y+(up?-30:10),tw,20);ox.fillStyle='#fff';ox.textAlign='center';ox.textBaseline='middle';ox.fillText(t,b.x,b.y+(up?-20:20))}}
+  if(ruler){const a=scr(ruler.a),b=scr(ruler.b);if(ruler.a.v!=null&&ruler.b.v!=null&&a.x!=null&&b.x!=null){const up=ruler.b.v>=ruler.a.v,col=up?'38,166,154':'239,83,80';
+    /* линейка: изменение цены и %, число свечей, время, объём за отрезок */
+    const x1=Math.min(a.x,b.x),y1=Math.min(a.y,b.y),bw=Math.abs(b.x-a.x),bh=Math.abs(b.y-a.y);
+    ox.fillStyle=`rgba(${col},.16)`;ox.fillRect(x1,y1,bw,bh);ox.strokeStyle=`rgba(${col},.9)`;ox.lineWidth=1;ox.setLineDash([4,3]);ox.strokeRect(x1,y1,bw,bh);ox.setLineDash([]);
+    const mx=(a.x+b.x)/2,my=(a.y+b.y)/2,arr=(xa,ya,xb,yb)=>{ox.beginPath();ox.moveTo(xa,ya);ox.lineTo(xb,yb);ox.stroke();const an=Math.atan2(yb-ya,xb-xa);ox.beginPath();ox.moveTo(xb,yb);ox.lineTo(xb-7*Math.cos(an-.5),yb-7*Math.sin(an-.5));ox.lineTo(xb-7*Math.cos(an+.5),yb-7*Math.sin(an+.5));ox.closePath();ox.fill()};
+    ox.strokeStyle=`rgb(${col})`;ox.fillStyle=`rgb(${col})`;ox.lineWidth=1.5;if(bh>12)arr(mx,a.y,mx,b.y);if(bw>12)arr(a.x,my,b.x,my);
+    const ta=Math.min(ruler.a.t,ruler.b.t),tb=Math.max(ruler.a.t,ruler.b.t);let vq=0;candles.forEach(k=>{if(k.t>=ta&&k.t<=tb)vq+=k.v*k.c});
+    const dv=ruler.b.v-ruler.a.v,pc=(ruler.b.v/ruler.a.v-1)*100,bars=Math.round((ruler.b.t-ruler.a.t)/barSec());
+    pill([(dv>=0?'+':'')+dv.toFixed(prec)+'  ('+(pc>=0?'+':'')+pc.toFixed(2)+'%)',bars+' свеч. · '+fmtDur(ruler.b.t-ruler.a.t)+(vq?' · объём '+fmtUsd(vq):'')],mx,up?y1-26:y1+bh+26,`rgba(${col},.95)`,'c')}}
   ox.restore();
 }
-/* позиция Long/Short: зелёная зона — прибыль, красная — риск; соотношение, проценты и итог по свечам после входа */
+/* позиция Long/Short как в TradingView: зелёная зона — прибыль, красная — риск.
+   По депозиту и риску (%) считаем объём позиции и прибыль/убыток в $; по свечам после входа — результат и где вышли. */
 function posDraw(d,a,b,c,right,sel){
   const P=d.p,e=P[0].v,tp=P[1].v,sl=P[2].v,lg=d.k==='long',x1=Math.min(a.x,b.x),x2=Math.max(a.x,b.x),w=Math.max(4,x2-x1);
-  const pt=(tp/e-1)*100,ps=(sl/e-1)*100,rr=Math.abs(sl-e)>0?Math.abs(tp-e)/Math.abs(sl-e):0;
-  let res='';const t0=P[0].t,t1=P[1].t;for(const k of candles){if(k.t<t0)continue;if(k.t>t1)break;const hitTp=lg?k.h>=tp:k.l<=tp,hitSl=lg?k.l<=sl:k.h>=sl;if(hitSl){res='sl';break}if(hitTp){res='tp';break}}
-  const last=candles.length?candles[candles.length-1].c:e,pnl=(lg?last/e-1:1-last/e)*100;
-  ox.fillStyle='rgba(38,166,154,.22)';ox.fillRect(x1,Math.min(a.y,b.y),w,Math.abs(b.y-a.y));
-  ox.fillStyle='rgba(239,83,80,.22)';ox.fillRect(x1,Math.min(a.y,c.y),w,Math.abs(c.y-a.y));
+  const pt=Math.abs(tp/e-1)*100,ps=Math.abs(sl/e-1)*100,rr=Math.abs(sl-e)>0?Math.abs(tp-e)/Math.abs(sl-e):0;
+  const risk=POS.dep*POS.risk/100,qty=Math.abs(e-sl)>0?risk/Math.abs(e-sl):0,prof=qty*Math.abs(tp-e),notional=qty*e;
+  let res='',xi=-1,xp=0,nb=0;const t0=P[0].t,t1=P[1].t;
+  for(let i=0;i<candles.length;i++){const k=candles[i];if(k.t<t0)continue;if(k.t>t1)break;nb++;const hitTp=lg?k.h>=tp:k.l<=tp,hitSl=lg?k.l<=sl:k.h>=sl;
+    if(hitSl){res='sl';xi=i;xp=sl;break}if(hitTp){res='tp';xi=i;xp=tp;break}}
+  const last=candles.length?candles[candles.length-1].c:e,pnl=(lg?last/e-1:1-last/e)*100,pnl$=qty*(lg?last-e:e-last);
+  const yTop=Math.min(a.y,b.y),yS=Math.min(a.y,c.y);
+  ox.fillStyle='rgba(38,166,154,.24)';ox.fillRect(x1,yTop,w,Math.abs(b.y-a.y));
+  ox.fillStyle='rgba(239,83,80,.24)';ox.fillRect(x1,yS,w,Math.abs(c.y-a.y));
+  /* живая часть: от входа до текущей цены — темнее (видно, сколько уже прошли к цели или к стопу) */
+  if(!res&&candles.length){const xl=Math.min(x2,t2x(candles[candles.length-1].t)??x2),yl=series.priceToCoordinate(last);
+    if(yl!=null&&xl>x1){ox.fillStyle=pnl>=0?'rgba(38,166,154,.35)':'rgba(239,83,80,.35)';ox.fillRect(x1,Math.min(a.y,yl),xl-x1,Math.abs(yl-a.y))}}
   ox.lineWidth=1.5;ox.strokeStyle='#26a69a';ox.beginPath();ox.moveTo(x1,b.y);ox.lineTo(x2,b.y);ox.stroke();
   ox.strokeStyle='#ef5350';ox.beginPath();ox.moveTo(x1,c.y);ox.lineTo(x2,c.y);ox.stroke();
-  ox.strokeStyle='#d6dae3';ox.lineWidth=2;ox.beginPath();ox.moveTo(x1,a.y);ox.lineTo(x2,a.y);ox.stroke();
-  ox.font='600 11px system-ui';ox.textBaseline='middle';ox.textAlign='left';
-  const lab=(t,y,bg)=>{const tw=ox.measureText(t).width+10,x=Math.min(Math.max(x1,4),right-tw-4);ox.fillStyle=bg;ox.fillRect(x,y-9,tw,18);ox.fillStyle='#fff';ox.fillText(t,x+5,y)};
-  const tpUp=b.y<a.y;
-  lab('Цель '+tp.toFixed(prec)+' ('+(pt>=0?'+':'')+pt.toFixed(2)+'%)',b.y+(tpUp?-11:11),'rgba(38,166,154,.95)');
-  lab('Стоп '+sl.toFixed(prec)+' ('+(ps>=0?'+':'')+ps.toFixed(2)+'%)',c.y+(tpUp?11:-11),'rgba(239,83,80,.95)');
-  const st=res==='tp'?'✅ цель достигнута':res==='sl'?'❌ стоп сработал':'сейчас '+(pnl>=0?'+':'')+pnl.toFixed(2)+'%';
-  lab((lg?'LONG':'SHORT')+' '+e.toFixed(prec)+' · R:R '+rr.toFixed(2)+' · '+st,a.y,res==='tp'?'rgba(38,166,154,.95)':res==='sl'?'rgba(239,83,80,.95)':'rgba(42,46,57,.95)');
-  if(sel){ox.fillStyle='#fff';ox.strokeStyle='#2962ff';ox.lineWidth=2;[a,b,c].forEach(p=>{ox.beginPath();ox.arc(p.x,p.y,6,0,6.2832);ox.fill();ox.stroke()})}
+  ox.strokeStyle='#e6e9ef';ox.lineWidth=2;ox.beginPath();ox.moveTo(x1,a.y);ox.lineTo(x2,a.y);ox.stroke();
+  if(res&&xi>=0){const ex=t2x(candles[xi].t),ey=series.priceToCoordinate(xp);if(ex!=null&&ey!=null){ox.setLineDash([4,3]);ox.strokeStyle=res==='tp'?'#26a69a':'#ef5350';ox.beginPath();ox.moveTo(x1,a.y);ox.lineTo(ex,ey);ox.stroke();ox.setLineDash([]);
+    ox.fillStyle=res==='tp'?'#26a69a':'#ef5350';ox.beginPath();ox.arc(ex,ey,6,0,6.2832);ox.fill();ox.fillStyle='#fff';ox.font='800 9px system-ui';ox.textAlign='center';ox.textBaseline='middle';ox.fillText(res==='tp'?'✓':'✕',ex,ey)}}
+  const tpUp=b.y<a.y,cx=x1+w/2;
+  pill(['Цель '+tp.toFixed(prec)+'  +'+pt.toFixed(2)+'%  ·  +'+fmtUsd(prof).replace('$','$')],cx,b.y+(tpUp?-14:14),'rgba(38,166,154,.95)','c');
+  pill(['Стоп '+sl.toFixed(prec)+'  −'+ps.toFixed(2)+'%  ·  −'+fmtUsd(risk)],cx,c.y+(tpUp?14:-14),'rgba(239,83,80,.95)','c');
+  const st=res==='tp'?'✅ цель за '+nb+' свеч.':res==='sl'?'❌ стоп за '+nb+' свеч.':'сейчас '+(pnl>=0?'+':'')+pnl.toFixed(2)+'% ('+(pnl$>=0?'+':'')+fmtUsd(pnl$)+')';
+  /* главная надпись — справа от позиции, если есть место, иначе в середине зелёной зоны (там нет ручек) */
+  const side=right-x2>175,my=Math.abs(b.y-a.y)>70?(a.y+b.y)/2:a.y;
+  pill([(lg?'LONG ':'SHORT ')+e.toFixed(prec)+'  ·  R/R '+rr.toFixed(2),'Объём '+fmtUsd(notional)+' · '+(qty>=100?qty.toFixed(0):qty.toPrecision(3))+' монет',st],side?x2+12:cx,side?a.y:my,res==='tp'?'rgba(38,166,154,.97)':res==='sl'?'rgba(239,83,80,.97)':'rgba(30,34,45,.95)',side?'l':'c');
+  if(sel){ox.fillStyle='#fff';ox.strokeStyle='#2962ff';ox.lineWidth=2;[a,{x:x1,y:b.y},{x:x1,y:c.y}].forEach(p=>{ox.beginPath();ox.arc(p.x,p.y,7,0,6.2832);ox.fill();ox.stroke()});
+    ox.fillStyle='#2962ff';ox.fillRect(x2-5,a.y-12,10,24);ox.fillStyle='#fff';ox.font='700 10px system-ui';ox.textAlign='center';ox.fillText('⇔',x2,a.y)}
 }
 function renderDBar(){
   const el=$('#dbar');if(!el)return;
@@ -2168,15 +2205,19 @@ function renderDBar(){
    +'<span class="dsep"></span>'+DCOL.map(c=>'<button class="dc'+(c===dcol?' on':'')+'" data-c="'+c+'" style="background:'+c+'"></button>').join('')
    +'<select id="dwid">'+[1,2,3,4].map(n=>'<option'+(n===dwid?' selected':'')+'>'+n+'</option>').join('')+'</select>'
    +'<input id="dtxt" placeholder="текст для T" value="'+esc(($('#dtxt')||{}).value||'')+'">'
+   +'<button id="dmag" class="dt'+(POS.mag?' on':'')+'" title="Магнит">🧲<small>Магнит</small></button>'
+   +((tool==='long'||tool==='short'||(selD>=0&&DR[selD]&&/long|short/.test(DR[selD].k)))?'<label class="dpos">Депозит $<input id="pdep" type="number" min="1" value="'+POS.dep+'"></label><label class="dpos">Риск %<input id="prisk" type="number" min="0.1" step="0.1" value="'+POS.risk+'"></label>':'')
    +'<button id="ddel"'+(selD<0?' disabled':'')+'>🗑 Удалить</button><button id="dclr">Очистить всё</button>'
    +(tool!=='cur'?'<span class="dhint">'+(tool==='long'||tool==='short'?'Нажмите на цену входа — цель и стоп поставятся сами, потом их можно перетащить за точки':tool==='ruler'?'Протяните пальцем по графику':NPT[tool]===1?'Нажмите на график':NPT[tool]===2?'Проведите пальцем от точки к точке':'Проведите линию, затем нажмите третью точку')+'</span>':'');
 }
 $('#dbar').onclick=e=>{const b=e.target.closest('button');if(!b)return;
   if(b.dataset.k){tool=b.dataset.k;pend=[];hov=null;if(tool!=='ruler')ruler=null;renderDBar()}
   else if(b.dataset.c){dcol=b.dataset.c;if(selD>=0){DR[selD].c=dcol;saveDR()}renderDBar()}
+  else if(b.id==='dmag'){POS.mag=!POS.mag;savePos();renderDBar()}
   else if(b.id==='ddel'){if(selD>=0){DR.splice(selD,1);selD=-1;saveDR();renderDBar()}}
   else if(b.id==='dclr'){if(!DR.length)return;if(b.dataset.ok){DR=[];selD=-1;saveDR();renderDBar()}else{b.dataset.ok=1;b.textContent='Точно? Нажмите ещё раз';setTimeout(()=>{if(b.isConnected){delete b.dataset.ok;b.textContent='Очистить всё'}},3000)}}};
-$('#dbar').onchange=e=>{if(e.target.id==='dwid'){dwid=+e.target.value;if(selD>=0){DR[selD].w=dwid;saveDR()}}};
+$('#dbar').onchange=e=>{if(e.target.id==='pdep'||e.target.id==='prisk'){const v=+e.target.value;if(v>0){POS[e.target.id==='pdep'?'dep':'risk']=v;savePos()}return}
+  if(e.target.id==='dwid'){dwid=+e.target.value;if(selD>=0){DR[selD].w=dwid;saveDR()}}};
 $('#dbar').oninput=e=>{if(e.target.id==='dtxt'&&selD>=0&&DR[selD].k==='txt'){DR[selD].txt=e.target.value.slice(0,80);saveDR()}};
 $('#drb').onclick=()=>{const v=$('#dbar').style.display!=='flex';$('#dbar').style.display=v?'flex':'none';$('#drb').classList.toggle('on',v);if(!v){tool='cur';pend=[];ruler=null}renderDBar()};
 
