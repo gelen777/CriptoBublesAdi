@@ -1489,7 +1489,7 @@ async function openChart(sym,view){
   $('#ttl').innerHTML=esc(sym.replace('USDT','/USDT'))+(CM==='fut'?'<small class="mk">ФЬЮЧ</small>':'<small class="mk">СПОТ</small>');markTf();try{markFav()}catch(e){}
   if(S.view==='tv')S.view='own';setView(S.view);
   if(!chart){
-    const ok=await lwcReady;if(cur!==sym)return;if(chart){chart.applyOptions({watermark:{visible:true,fontSize:48,horzAlign:'center',vertAlign:'center',color:'rgba(120,123,134,.12)',text:sym.replace('USDT','/USDT')}});return load()}
+    const ok=await lwcReady;if(cur!==sym)return;if(chart){chart.applyOptions({watermark:{visible:false}});return load()}
     if(!ok){$('#chart').innerHTML='<div style="padding:20px;color:#ef5350">Не удалось загрузить библиотеку графика. Проверь интернет или VPN, либо нажми TradingView.</div>';return}
     chart=LightweightCharts.createChart($('#chart'),{autoSize:true,
       layout:{background:{color:'#131722'},textColor:'#d1d4dc',fontFamily:'-apple-system,BlinkMacSystemFont,Trebuchet MS,Roboto,sans-serif'},
@@ -1506,7 +1506,7 @@ async function openChart(sym,view){
     rebuildInd();
     chart.subscribeCrosshairMove(legend);
   }
-  chart.applyOptions({watermark:{visible:true,fontSize:48,horzAlign:'center',vertAlign:'center',color:'rgba(120,123,134,.12)',text:sym.replace('USDT','/USDT')}});
+  chart.applyOptions({watermark:{visible:false}});
   load();
 }
 async function load(){
