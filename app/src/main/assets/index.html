@@ -40,6 +40,19 @@ button{cursor:pointer}
 #panel input[type=number]{width:110px}
 #wrap{display:flex;flex:1;min-height:0}
 #main{position:relative;flex:1;min-width:0}
+#dctx{position:absolute;z-index:6;display:none;gap:2px;padding:4px;background:rgba(22,26,36,.96);border:1px solid #2a3142;border-radius:12px;box-shadow:0 6px 18px rgba(0,0,0,.45)}
+#dctx button{width:38px;height:36px;border:0;border-radius:9px;background:transparent;color:#d6dae3;font-size:17px;display:flex;align-items:center;justify-content:center}
+#dctx button.on{background:#2962ff;color:#fff}#dctx .cdot{width:18px;height:18px;border-radius:50%;border:2px solid #fff}
+#dset{position:absolute;z-index:7;left:0;right:0;bottom:0;max-height:78%;overflow-y:auto;display:none;background:#0f131b;border-top:1px solid #2a3142;border-radius:16px 16px 0 0;padding:10px 14px 18px;box-shadow:0 -10px 30px rgba(0,0,0,.5);font-size:13px;color:#c9cfdb}
+#dset .st{display:flex;align-items:center;gap:8px;margin-bottom:8px}#dset .st b{flex:1;font-size:15px;color:#fff}
+#dset .st button,#dset .sb{background:#1a1f2b;border:1px solid #2a3142;color:#d6dae3;border-radius:9px;padding:7px 12px;font-size:13px}
+#dset .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}#dset label{display:flex;flex-direction:column;gap:3px;font-size:11.5px;color:#8b93a7}
+#dset input[type=number],#dset select{background:#151a24;border:1px solid #2a3142;color:#fff;border-radius:8px;padding:8px;font-size:15px;width:100%;box-sizing:border-box}
+#dset .h{margin:12px 0 6px;font-size:12px;color:#9cc0ff;font-weight:700;text-transform:uppercase;letter-spacing:.4px}
+#dset .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}#dset .ck{flex-direction:row;align-items:center;gap:6px;font-size:13px;color:#c9cfdb}
+#dset .sw{width:30px;height:30px;border-radius:50%;border:2px solid transparent}#dset .sw.on{border-color:#fff}
+#dset .seg{display:flex;border:1px solid #2a3142;border-radius:9px;overflow:hidden}#dset .seg button{border:0;border-radius:0;background:#151a24;color:#aab2c5;padding:7px 12px}#dset .seg button.on{background:#2962ff;color:#fff}
+#dset .sum{background:#151a24;border:1px solid #232a3a;border-radius:10px;padding:8px 10px;margin-top:10px;line-height:1.55;font-size:12.5px}
 #chart,#ov,#tvw{position:absolute;inset:0}
 #chart{z-index:0}#ov{pointer-events:none;z-index:1}
 .chb{margin-top:10px}.chbh{display:flex;justify-content:space-between;color:#c9cfdb;font-size:13px}.chbh b{color:#9cc0ff}.chbr{display:flex;gap:8px;align-items:center;margin-top:4px}.chbr input{flex:1;accent-color:#3b82f6;height:28px}.chbr button,.chbp button{background:#1a1f2b;border:1px solid #2a3142;color:#d6dae3;border-radius:9px;min-width:34px;height:30px;font-size:15px}.chbp{display:flex;gap:6px;margin-top:6px}.chbp button{flex:1;font-size:12.5px;white-space:nowrap;height:auto;padding:7px 4px}
@@ -284,7 +297,7 @@ select,input{outline:none}select:focus,input:focus{border-color:var(--ac)}
       <button id="tpos">Таблицу вправо</button>
     </div>
   </div>
-  <div id="wrap"><div id="main"><div id="chart"></div><canvas id="ov"></canvas><div id="lg"></div><div id="stat"></div><div id="tvw"></div></div><div id="side"></div></div>
+  <div id="wrap"><div id="main"><div id="chart"></div><canvas id="ov"></canvas><div id="dctx"></div><div id="dset"></div><div id="lg"></div><div id="stat"></div><div id="tvw"></div></div><div id="side"></div></div>
 </div>
 <script>
 const $=s=>document.querySelector(s);
@@ -1449,6 +1462,8 @@ window.cbBack=()=>{
       if(cbVis($('#ipanel'))){$('#indb').click();return 1}
       if(cbVis($('#panel'))){$('#panel').style.display='none';return 1}
       if(cbVis($('#szp'))){$('#szx').click();return 1}
+      if(cbVis($('#dset'))){closeDset();return 1}
+      if(selD>=0){selD=-1;renderDBar();ctxShow();return 1}
       if(cbVis($('#dbar'))){$('#drb').click();return 1}
       $('#back').click();return 1}
     /* окна поверх пузырей — сначала самые верхние (настройки, новости, поиск, карточка монеты) */
@@ -2053,7 +2068,11 @@ const DCOL=['#2962ff','#ffd54f','#26a69a','#ef5350','#ab47bc','#ff9800','#ffffff
 const FIBL=[0,.236,.382,.5,.618,.786,1,1.618];
 let DR=[],tool='cur',pend=[],hov=null,selD=-1,drag=null,dcol='#2962ff',dwid=2,ruler=null,pdown=null;
 /* настройки позиции (депозит и риск на сделку) и магнит к свечам */
-const POS=Object.assign({dep:1000,risk:1,mag:true},LS.get('cbPos',{}));const savePos=()=>LS.set('cbPos',POS);
+const POS=Object.assign({dep:1000,risk:1,rmode:'%',lev:1,fee:0.05,compact:false,ext:false,usd:true,mag:true},LS.get('cbPos',{}));const savePos=()=>LS.set('cbPos',POS);
+const posO=d=>Object.assign({dep:POS.dep,risk:POS.risk,rmode:POS.rmode,lev:POS.lev,fee:POS.fee,compact:POS.compact,ext:POS.ext,usd:POS.usd},d.o||{});
+/* расчёт позиции: объём по риску, прибыль/убыток с комиссией, маржа по плечу */
+function posCalc(d){const o=posO(d),e=d.p[0].v,tp=d.p[1].v,sl=d.p[2].v,risk=o.rmode==='$'?o.risk:o.dep*o.risk/100,qty=Math.abs(e-sl)>0?risk/Math.abs(e-sl):0,
+  notional=qty*e,fee=notional*o.fee/100*2,prof=qty*Math.abs(tp-e)-fee,loss=risk+fee;return {o,e,tp,sl,risk,qty,notional,fee,prof,loss,rr:loss>0?prof/loss:0,margin:notional/Math.max(1,o.lev)}}
 /* магнит: точка прилипает к ближайшей цене свечи (открытие/макс/мин/закрытие), если палец рядом */
 function snapPt(P){if(!POS.mag||!series||!chart||P.t==null)return P;const l=chart.timeScale().coordinateToLogical(P.x);if(l==null)return P;const i=Math.round(l),k=candles[i];if(!k)return P;
   let best=null,bd=16;[k.o,k.h,k.l,k.c].forEach(v=>{const y=series.priceToCoordinate(v);if(y!=null&&Math.abs(y-P.y)<bd){bd=Math.abs(y-P.y);best={v,y}}});
@@ -2065,7 +2084,7 @@ function pill(lines,x,y,bg,align){ox.font='600 11.5px system-ui';const lh=15,tw=
   ox.fillStyle=bg;ox.beginPath();ox.roundRect?ox.roundRect(px,y-th/2,tw,th,6):ox.rect(px,y-th/2,tw,th);ox.fill();
   ox.fillStyle='#fff';ox.textAlign='left';ox.textBaseline='middle';lines.forEach((t,i)=>ox.fillText(t,px+7,y-th/2+3+lh/2+i*lh));return {x:px,w:tw,h:th}}
 const drKey=()=>'cbDr:'+CM+':'+cur;
-function loadDR(){try{DR=JSON.parse(localStorage.getItem(drKey())||'[]')}catch(e){DR=[]}selD=-1;pend=[];hov=null;ruler=null;renderDBar()}
+function loadDR(){try{DR=JSON.parse(localStorage.getItem(drKey())||'[]')}catch(e){DR=[]}selD=-1;pend=[];hov=null;ruler=null;renderDBar();if($('#dctx'))ctxShow();if($('#dset'))closeDset()}
 function saveDR(){try{localStorage.setItem(drKey(),JSON.stringify(DR))}catch(e){}}
 function barSec(){const a=candles,n=a.length;return n>1?a[n-1].t-a[n-2].t:60}
 function t2x(t){const A=candles,an=A.length;if(!an||!chart)return null;const ts=chart.timeScale(),d=barSec();
@@ -2094,7 +2113,7 @@ function dSegs(d,P,w){
 }
 function hitD(x,y){
   const w=$('#main').clientWidth;
-  for(let i=DR.length-1;i>=0;i--){const d=DR[i],P=d.p.map(scr);
+  for(let i=DR.length-1;i>=0;i--){const d=DR[i];if(d.hid)continue;const P=d.p.map(scr);
     for(let j=0;j<P.length;j++)if(P[j].x!=null&&P[j].y!=null&&Math.hypot(P[j].x-x,P[j].y-y)<20)return {i,hp:j};
     if(d.k==='long'||d.k==='short'){const xl=Math.min(P[0].x,P[1].x);if(Math.hypot(xl-x,P[1].y-y)<20)return {i,hp:1};if(Math.hypot(xl-x,P[2].y-y)<20)return {i,hp:2};if(Math.hypot(Math.max(P[0].x,P[1].x)-x,P[0].y-y)<20)return {i,hp:3}}   /* правый край — ширина позиции */
     if(d.k==='txt'&&P[0].x!=null&&x>=P[0].x-4&&x<=P[0].x+8*(d.txt||'').length+8&&Math.abs(y-P[0].y)<14)return {i,hp:-1};
@@ -2108,7 +2127,7 @@ function finishD(){
     const e=d.p[0],a=atrN(candles,14)||e.v*.01,up=tool==='long',t2=e.t+25*barSec();
     d.p=[e,{t:t2,v:e.v+(up?3:-3)*a},{t:t2,v:e.v-(up?1.5:-1.5)*a}]}
   if(tool==='txt')d.txt=(($('#dtxt')||{}).value||'Текст').slice(0,80);
-  DR.push(d);pend=[];hov=null;selD=DR.length-1;saveDR();tool='cur';renderDBar();
+  DR.push(d);pend=[];hov=null;selD=DR.length-1;saveDR();tool='cur';renderDBar();ctxShow();
 }
 {const M=$('#main');
   M.addEventListener('pointerdown',e=>{
@@ -2117,8 +2136,8 @@ function finishD(){
       const Q=snapPt(P);if(tool==='ruler'){ruler={a:Q,b:Q,live:1};return}
       pend.push({t:Q.t,v:Q.v});hov={t:Q.t,v:Q.v};pdown=P;if(pend.length>=NPT[tool])finishD();return}
     const h=hitD(P.x,P.y);
-    if(h){e.stopPropagation();e.preventDefault();selD=h.i;drag={i:h.i,hp:h.hp,st:P,orig:JSON.parse(JSON.stringify(DR[h.i].p))};renderDBar()}
-    else if(selD>=0){selD=-1;renderDBar()}
+    if(h){e.stopPropagation();e.preventDefault();selD=h.i;drag=DR[h.i].lock?null:{i:h.i,hp:h.hp,st:P,orig:JSON.parse(JSON.stringify(DR[h.i].p))};if(DR[h.i].lock)toast('🔒 Рисунок закреплён — снимите замок, чтобы двигать');renderDBar();ctxShow()}
+    else if(selD>=0){selD=-1;renderDBar();ctxShow()}
   },true);
   M.addEventListener('pointermove',e=>{
     if(!chart||!series||!candles.length)return;
@@ -2141,24 +2160,25 @@ function finishD(){
 function drawD(w,h,right){
   if(!series||!candles.length)return;
   const one=(d,sel)=>{
-    const P=d.p.map(scr);if(P.some(p=>p.x==null||p.y==null))return;const [a,b,c]=P;
-    ox.strokeStyle=d.c;ox.fillStyle=d.c;ox.lineWidth=d.w||2;ox.setLineDash([]);
+    if(d.hid)return;const P=d.p.map(scr);if(P.some(p=>p.x==null||p.y==null))return;const [a,b,c]=P;
+    ox.strokeStyle=d.c;ox.fillStyle=d.c;ox.lineWidth=d.w||2;ox.setLineDash(d.ls===1?[8,5]:d.ls===2?[2,4]:[]);
     if((d.k==='long'||d.k==='short')&&c){posDraw(d,a,b,c,right,sel);return}
     if(d.k==='rect'&&b){ox.globalAlpha=.15;ox.fillRect(Math.min(a.x,b.x),Math.min(a.y,b.y),Math.abs(b.x-a.x),Math.abs(b.y-a.y));ox.globalAlpha=1}
     if(d.k==='tri'&&c){ox.globalAlpha=.15;ox.beginPath();ox.moveTo(a.x,a.y);ox.lineTo(b.x,b.y);ox.lineTo(c.x,c.y);ox.closePath();ox.fill();ox.globalAlpha=1}
     if(d.k==='ch'&&c){const o=c.y-(a.y+(b.y-a.y)*((c.x-a.x)/((b.x-a.x)||1e-9)));ox.globalAlpha=.12;ox.beginPath();ox.moveTo(a.x,a.y);ox.lineTo(b.x,b.y);ox.lineTo(b.x,b.y+o);ox.lineTo(a.x,a.y+o);ox.closePath();ox.fill();ox.globalAlpha=1}
-    dSegs(d,P,right).forEach(([p,q])=>{ox.beginPath();ox.moveTo(p.x,p.y);ox.lineTo(q.x,Math.min(q.y,h));ox.stroke()});
+    dSegs(d,P,right).forEach(([p,q])=>{ox.beginPath();ox.moveTo(p.x,p.y);ox.lineTo(q.x,Math.min(q.y,h));ox.stroke()});ox.setLineDash([]);
     ox.font='600 11px system-ui';ox.textBaseline='middle';ox.textAlign='left';
     if(d.k==='fib'&&b){const FC=['120,123,134','239,83,80','255,152,0','76,175,80','38,166,154','41,98,255','120,123,134','171,71,188'],x0=Math.min(a.x,b.x);
       FIBL.forEach((l,i)=>{const y=b.y+(a.y-b.y)*l;if(i<FIBL.length-1){const y2=b.y+(a.y-b.y)*FIBL[i+1];ox.fillStyle=`rgba(${FC[i]},.10)`;ox.fillRect(x0,Math.min(y,y2),right-x0,Math.abs(y2-y))}
         const v=d.p[1].v+(d.p[0].v-d.p[1].v)*l;ox.strokeStyle=`rgb(${FC[i]})`;ox.lineWidth=1;ox.beginPath();ox.moveTo(x0,y);ox.lineTo(right,y);ox.stroke();ox.fillStyle=`rgb(${FC[i]})`;ox.fillText(l+' ('+v.toFixed(prec)+')',x0+4,y-8)});ox.strokeStyle=d.c}
     if(d.k==='hl'){const t=d.p[0].v.toFixed(prec),tw=ox.measureText(t).width+10;ox.fillRect(right-tw,a.y-9,tw,18);ox.fillStyle='#000';ox.fillText(t,right-tw+5,a.y)}
     if(d.k==='txt'){ox.font='600 14px system-ui';ox.fillText(d.txt||'Текст',a.x,a.y)}
-    if(sel){ox.fillStyle='#fff';ox.strokeStyle=d.c;ox.lineWidth=2;P.forEach(p=>{ox.beginPath();ox.arc(p.x,p.y,7,0,6.2832);ox.fill();ox.stroke()})}
+    if(sel&&!d.lock){ox.fillStyle='#fff';ox.strokeStyle=d.c;ox.lineWidth=2;P.forEach(p=>{ox.beginPath();ox.arc(p.x,p.y,7,0,6.2832);ox.fill();ox.stroke()})}
+    if(sel&&d.lock){ox.font='13px system-ui';ox.textAlign='center';ox.textBaseline='middle';P.forEach(p=>ox.fillText('🔒',p.x,p.y))}
     if(d.k==='tl'&&b){const v0=d.p[0].v,v1=d.p[1].v,pc=(v1/v0-1)*100,bars=Math.round((d.p[1].t-d.p[0].t)/barSec());pill([(pc>=0?'+':'')+pc.toFixed(2)+'% · '+bars+' свеч.'],b.x+10,b.y,'rgba(42,46,57,.92)','l')}
   };
   ox.save();ox.beginPath();ox.rect(0,0,right,h);ox.clip();
-  DR.forEach((d,i)=>one(d,i===selD));
+  DR.forEach((d,i)=>one(d,i===selD));ctxPos();
   if(tool!=='cur'&&tool!=='ruler'&&pend.length&&hov){const pts=pend.concat([hov]).slice(0,NPT[tool]);one({k:tool,p:pts,c:dcol,w:dwid,txt:''},true)}
   if(ruler){const a=scr(ruler.a),b=scr(ruler.b);if(ruler.a.v!=null&&ruler.b.v!=null&&a.x!=null&&b.x!=null){const up=ruler.b.v>=ruler.a.v,col=up?'38,166,154':'239,83,80';
     /* линейка: изменение цены и %, число свечей, время, объём за отрезок */
@@ -2174,34 +2194,86 @@ function drawD(w,h,right){
 /* позиция Long/Short как в TradingView: зелёная зона — прибыль, красная — риск.
    По депозиту и риску (%) считаем объём позиции и прибыль/убыток в $; по свечам после входа — результат и где вышли. */
 function posDraw(d,a,b,c,right,sel){
-  const P=d.p,e=P[0].v,tp=P[1].v,sl=P[2].v,lg=d.k==='long',x1=Math.min(a.x,b.x),x2=Math.max(a.x,b.x),w=Math.max(4,x2-x1);
-  const pt=Math.abs(tp/e-1)*100,ps=Math.abs(sl/e-1)*100,rr=Math.abs(sl-e)>0?Math.abs(tp-e)/Math.abs(sl-e):0;
-  const risk=POS.dep*POS.risk/100,qty=Math.abs(e-sl)>0?risk/Math.abs(e-sl):0,prof=qty*Math.abs(tp-e),notional=qty*e;
-  let res='',xi=-1,xp=0,nb=0;const t0=P[0].t,t1=P[1].t;
+  const K=posCalc(d),o=K.o,P=d.p,e=K.e,tp=K.tp,sl=K.sl,lg=d.k==='long',x1=Math.min(a.x,b.x),x2=o.ext?right:Math.max(a.x,b.x),w=Math.max(4,x2-x1);
+  const pt=Math.abs(tp/e-1)*100,ps=Math.abs(sl/e-1)*100;
+  let res='',xi=-1,xp=0,nb=0;const t0=P[0].t,t1=o.ext?Infinity:P[1].t;
   for(let i=0;i<candles.length;i++){const k=candles[i];if(k.t<t0)continue;if(k.t>t1)break;nb++;const hitTp=lg?k.h>=tp:k.l<=tp,hitSl=lg?k.l<=sl:k.h>=sl;
     if(hitSl){res='sl';xi=i;xp=sl;break}if(hitTp){res='tp';xi=i;xp=tp;break}}
-  const last=candles.length?candles[candles.length-1].c:e,pnl=(lg?last/e-1:1-last/e)*100,pnl$=qty*(lg?last-e:e-last);
+  const last=candles.length?candles[candles.length-1].c:e,pnl=(lg?last/e-1:1-last/e)*100,pnl$=K.qty*(lg?last-e:e-last)-K.fee;
   const yTop=Math.min(a.y,b.y),yS=Math.min(a.y,c.y);
-  ox.fillStyle='rgba(38,166,154,.24)';ox.fillRect(x1,yTop,w,Math.abs(b.y-a.y));
-  ox.fillStyle='rgba(239,83,80,.24)';ox.fillRect(x1,yS,w,Math.abs(c.y-a.y));
-  /* живая часть: от входа до текущей цены — темнее (видно, сколько уже прошли к цели или к стопу) */
+  ox.fillStyle='rgba(38,166,154,.22)';ox.fillRect(x1,yTop,w,Math.abs(b.y-a.y));
+  ox.fillStyle='rgba(239,83,80,.22)';ox.fillRect(x1,yS,w,Math.abs(c.y-a.y));
   if(!res&&candles.length){const xl=Math.min(x2,t2x(candles[candles.length-1].t)??x2),yl=series.priceToCoordinate(last);
-    if(yl!=null&&xl>x1){ox.fillStyle=pnl>=0?'rgba(38,166,154,.35)':'rgba(239,83,80,.35)';ox.fillRect(x1,Math.min(a.y,yl),xl-x1,Math.abs(yl-a.y))}}
+    if(yl!=null&&xl>x1){ox.fillStyle=pnl>=0?'rgba(38,166,154,.32)':'rgba(239,83,80,.32)';ox.fillRect(x1,Math.min(a.y,yl),xl-x1,Math.abs(yl-a.y))}}
   ox.lineWidth=1.5;ox.strokeStyle='#26a69a';ox.beginPath();ox.moveTo(x1,b.y);ox.lineTo(x2,b.y);ox.stroke();
   ox.strokeStyle='#ef5350';ox.beginPath();ox.moveTo(x1,c.y);ox.lineTo(x2,c.y);ox.stroke();
   ox.strokeStyle='#e6e9ef';ox.lineWidth=2;ox.beginPath();ox.moveTo(x1,a.y);ox.lineTo(x2,a.y);ox.stroke();
   if(res&&xi>=0){const ex=t2x(candles[xi].t),ey=series.priceToCoordinate(xp);if(ex!=null&&ey!=null){ox.setLineDash([4,3]);ox.strokeStyle=res==='tp'?'#26a69a':'#ef5350';ox.beginPath();ox.moveTo(x1,a.y);ox.lineTo(ex,ey);ox.stroke();ox.setLineDash([]);
     ox.fillStyle=res==='tp'?'#26a69a':'#ef5350';ox.beginPath();ox.arc(ex,ey,6,0,6.2832);ox.fill();ox.fillStyle='#fff';ox.font='800 9px system-ui';ox.textAlign='center';ox.textBaseline='middle';ox.fillText(res==='tp'?'✓':'✕',ex,ey)}}
-  const tpUp=b.y<a.y,cx=x1+w/2;
-  pill(['Цель '+tp.toFixed(prec)+'  +'+pt.toFixed(2)+'%  ·  +'+fmtUsd(prof).replace('$','$')],cx,b.y+(tpUp?-14:14),'rgba(38,166,154,.95)','c');
-  pill(['Стоп '+sl.toFixed(prec)+'  −'+ps.toFixed(2)+'%  ·  −'+fmtUsd(risk)],cx,c.y+(tpUp?14:-14),'rgba(239,83,80,.95)','c');
-  const st=res==='tp'?'✅ цель за '+nb+' свеч.':res==='sl'?'❌ стоп за '+nb+' свеч.':'сейчас '+(pnl>=0?'+':'')+pnl.toFixed(2)+'% ('+(pnl$>=0?'+':'')+fmtUsd(pnl$)+')';
-  /* главная надпись — справа от позиции, если есть место, иначе в середине зелёной зоны (там нет ручек) */
-  const side=right-x2>175,my=Math.abs(b.y-a.y)>70?(a.y+b.y)/2:a.y;
-  pill([(lg?'LONG ':'SHORT ')+e.toFixed(prec)+'  ·  R/R '+rr.toFixed(2),'Объём '+fmtUsd(notional)+' · '+(qty>=100?qty.toFixed(0):qty.toPrecision(3))+' монет',st],side?x2+12:cx,side?a.y:my,res==='tp'?'rgba(38,166,154,.97)':res==='sl'?'rgba(239,83,80,.97)':'rgba(30,34,45,.95)',side?'l':'c');
+  const tpUp=b.y<a.y,cx=x1+Math.min(w,right-x1)/2,$u=v=>o.usd?'  ·  '+v:'';
+  if(o.compact){pill(['+'+pt.toFixed(2)+'%'+$u('+'+fmtUsd(K.prof))],cx,b.y+(tpUp?-14:14),'rgba(38,166,154,.95)','c');pill(['−'+ps.toFixed(2)+'%'+$u('−'+fmtUsd(K.loss))],cx,c.y+(tpUp?14:-14),'rgba(239,83,80,.95)','c')}
+  else{pill(['Цель '+tp.toFixed(prec)+'  +'+pt.toFixed(2)+'%'+$u('+'+fmtUsd(K.prof))],cx,b.y+(tpUp?-14:14),'rgba(38,166,154,.95)','c');
+    pill(['Стоп '+sl.toFixed(prec)+'  −'+ps.toFixed(2)+'%'+$u('−'+fmtUsd(K.loss))],cx,c.y+(tpUp?14:-14),'rgba(239,83,80,.95)','c')}
+  const st=res==='tp'?'✅ цель за '+nb+' свеч.':res==='sl'?'❌ стоп за '+nb+' свеч.':'сейчас '+(pnl>=0?'+':'')+pnl.toFixed(2)+'%'+(o.usd?' ('+(pnl$>=0?'+':'')+fmtUsd(pnl$)+')':'');
+  const L=o.compact?[(lg?'LONG':'SHORT')+' · R/R '+K.rr.toFixed(2)+' · '+st]:[(lg?'LONG ':'SHORT ')+e.toFixed(prec)+'  ·  R/R '+K.rr.toFixed(2),
+    'Объём '+fmtUsd(K.notional)+' · '+(K.qty>=100?K.qty.toFixed(0):K.qty.toPrecision(3))+' монет'+(o.lev>1?' · маржа '+fmtUsd(K.margin)+' (x'+o.lev+')':''),st];
+  const side=right-x2>175,my=Math.abs(b.y-a.y)>(o.compact?40:70)?(a.y+b.y)/2:a.y;
+  pill(L,side?x2+12:cx,side?a.y:my,res==='tp'?'rgba(38,166,154,.97)':res==='sl'?'rgba(239,83,80,.97)':'rgba(30,34,45,.95)',side?'l':'c');
+  if(d.lock&&sel){ox.font='14px system-ui';ox.textAlign='center';ox.textBaseline='middle';ox.fillText('🔒',x1,a.y);return}
   if(sel){ox.fillStyle='#fff';ox.strokeStyle='#2962ff';ox.lineWidth=2;[a,{x:x1,y:b.y},{x:x1,y:c.y}].forEach(p=>{ox.beginPath();ox.arc(p.x,p.y,7,0,6.2832);ox.fill();ox.stroke()});
-    ox.fillStyle='#2962ff';ox.fillRect(x2-5,a.y-12,10,24);ox.fillStyle='#fff';ox.font='700 10px system-ui';ox.textAlign='center';ox.fillText('⇔',x2,a.y)}
+    if(!o.ext){ox.fillStyle='#2962ff';ox.fillRect(x2-5,a.y-12,10,24);ox.fillStyle='#fff';ox.font='700 10px system-ui';ox.textAlign='center';ox.fillText('⇔',x2,a.y)}}
 }
+/* ---- панель у выбранного рисунка (как в TradingView): закрепить, настройки, цвет, стиль, копия, скрыть, удалить ---- */
+const LSTY=['━','┅','┈'];
+function ctxShow(){const el=$('#dctx'),d=DR[selD];if(!d||selD<0||d.hid||tool!=='cur'){el.style.display='none';return}
+  el.innerHTML='<button data-a="lock" class="'+(d.lock?'on':'')+'" title="Закрепить">'+(d.lock?'🔒':'🔓')+'</button><button data-a="set" title="Настройки">⚙</button>'
+    +'<button data-a="col" title="Цвет"><span class="cdot" style="background:'+d.c+'"></span></button>'+(d.k==='long'||d.k==='short'||d.k==='txt'?'':'<button data-a="sty" title="Стиль линии">'+LSTY[d.ls||0]+'</button>')
+    +'<button data-a="dup" title="Копия">⧉</button><button data-a="hid" title="Скрыть">👁</button><button data-a="del" title="Удалить">🗑</button>';
+  el.style.display='flex';ctxPos()}
+function ctxPos(){const el=$('#dctx'),d=DR[selD];if(!d||el.style.display==='none')return;const P=d.p.map(scr).filter(p=>p.x!=null&&p.y!=null);if(!P.length)return;
+  const M=$('#main'),W=M.clientWidth,H=M.clientHeight,ew=el.offsetWidth||260,eh=el.offsetHeight||44;let y=Math.min(...P.map(p=>p.y))-eh-16;if(d.k==='long'||d.k==='short'){const ys=P.map(p=>p.y);y=Math.min(...ys)-eh-34}
+  if(y<6)y=Math.max(...P.map(p=>p.y))+20;const x=Math.max(4,Math.min(W-ew-4,P.reduce((s,p)=>s+p.x,0)/P.length-ew/2));y=Math.max(4,Math.min(H-eh-4,y));
+  if(Math.abs((el._x||0)-x)>1||Math.abs((el._y||0)-y)>1){el._x=x;el._y=y;el.style.left=x+'px';el.style.top=y+'px'}}
+$('#dctx').addEventListener('pointerdown',e=>e.stopPropagation(),true);
+$('#dctx').onclick=e=>{const b=e.target.closest('button');if(!b)return;const d=DR[selD];if(!d)return;const a=b.dataset.a;
+  if(a==='lock'){d.lock=!d.lock;toast(d.lock?'🔒 Закреплено: не сдвинется случайно':'🔓 Можно двигать')}
+  else if(a==='col'){const i=DCOL.indexOf(d.c);d.c=DCOL[(i+1)%DCOL.length]}
+  else if(a==='sty'){d.ls=((d.ls||0)+1)%3}
+  else if(a==='dup'){const c=JSON.parse(JSON.stringify(d));const sh=8*barSec();c.p.forEach(q=>q.t+=sh);c.lock=false;DR.push(c);selD=DR.length-1}
+  else if(a==='hid'){d.hid=true;selD=-1;toast('👁 Скрыто. Вернуть: «Рисовать» → «Показать скрытые»')}
+  else if(a==='del'){DR.splice(selD,1);selD=-1}
+  else if(a==='set'){openDset();return}
+  saveDR();renderDBar();ctxShow()};
+/* ---- настройки рисунка: точные цены, деньги, вид ---- */
+function openDset(){const d=DR[selD];if(!d)return;const el=$('#dset'),isP=d.k==='long'||d.k==='short';let h='<div class="st"><b>⚙ '+({long:'Long позиция',short:'Short позиция',tl:'Линия тренда',ray:'Луч',hl:'Горизонтальная линия',vl:'Вертикальная линия',ch:'Канал',rect:'Прямоугольник',tri:'Треугольник',fib:'Фибоначчи',txt:'Текст'}[d.k]||'Рисунок')+'</b><button data-x="1">Готово</button></div>';
+  if(isP){const K=posCalc(d),o=K.o,pc=v=>Math.abs(v/K.e-1)*100;
+    h+='<div class="h">Цены</div><div class="grid"><label>Вход<input type="number" step="any" data-f="e" value="'+K.e.toFixed(prec)+'"></label><label>R/R<input type="number" value="'+K.rr.toFixed(2)+'" disabled></label>'
+      +'<label>Цель (цена)<input type="number" step="any" data-f="tp" value="'+K.tp.toFixed(prec)+'"></label><label>Цель, %<input type="number" step="0.1" data-f="tpp" value="'+pc(K.tp).toFixed(2)+'"></label>'
+      +'<label>Стоп (цена)<input type="number" step="any" data-f="sl" value="'+K.sl.toFixed(prec)+'"></label><label>Стоп, %<input type="number" step="0.1" data-f="slp" value="'+pc(K.sl).toFixed(2)+'"></label></div>'
+      +'<div class="h">Деньги</div><div class="grid"><label>Депозит, $<input type="number" step="any" data-o="dep" value="'+o.dep+'"></label>'
+      +'<label>Риск<div class="row"><input type="number" step="any" data-o="risk" value="'+o.risk+'" style="flex:1"><div class="seg"><button data-rm="%" class="'+(o.rmode==='%'?'on':'')+'">%</button><button data-rm="$" class="'+(o.rmode==='$'?'on':'')+'">$</button></div></div></label>'
+      +'<label>Плечо, x<input type="number" min="1" max="125" step="1" data-o="lev" value="'+o.lev+'"></label><label>Комиссия, % за сделку<input type="number" step="0.01" data-o="fee" value="'+o.fee+'"></label></div>'
+      +'<div class="sum">Объём позиции: <b>'+fmtUsd(K.notional)+'</b> ('+(K.qty>=100?K.qty.toFixed(0):K.qty.toPrecision(4))+' монет)<br>Маржа: <b>'+fmtUsd(K.margin)+'</b> · комиссия: '+fmtUsd(K.fee)+'<br>Прибыль на цели: <b style="color:#26c68c">+'+fmtUsd(K.prof)+'</b> · убыток на стопе: <b style="color:#ff6b6b">−'+fmtUsd(K.loss)+'</b></div>'
+      +'<div class="h">Вид</div><div class="row"><label class="ck"><input type="checkbox" data-c="compact"'+(o.compact?' checked':'')+'> Компактные подписи</label><label class="ck"><input type="checkbox" data-c="ext"'+(o.ext?' checked':'')+'> Продлить вправо</label><label class="ck"><input type="checkbox" data-c="usd"'+(o.usd?' checked':'')+'> Показывать $</label></div>'}
+  h+='<div class="h">Цвет и линия</div><div class="row">'+DCOL.map(c=>'<button class="sw'+(c===d.c?' on':'')+'" data-sw="'+c+'" style="background:'+c+'"></button>').join('')+'</div>';
+  if(!isP&&d.k!=='txt')h+='<div class="row" style="margin-top:8px"><div class="seg">'+[1,2,3,4].map(n=>'<button data-wd="'+n+'" class="'+((d.w||2)===n?'on':'')+'">'+n+' px</button>').join('')+'</div><div class="seg">'+LSTY.map((t,i)=>'<button data-ls="'+i+'" class="'+((d.ls||0)===i?'on':'')+'">'+t+'</button>').join('')+'</div></div>';
+  h+='<div class="row" style="margin-top:12px"><label class="ck"><input type="checkbox" data-lk="1"'+(d.lock?' checked':'')+'> 🔒 Закрепить (нельзя сдвинуть)</label></div>';
+  if(isP)h+='<div class="row" style="margin-top:10px"><button class="sb" data-def="1">Сделать эти деньги/вид по умолчанию</button></div>';
+  el.innerHTML=h;el.style.display='block'}
+function closeDset(){$('#dset').style.display='none'}
+$('#dset').addEventListener('pointerdown',e=>e.stopPropagation(),true);
+$('#dset').onchange=e=>{const d=DR[selD];if(!d)return;const t=e.target,v=+t.value,lg=d.k==='long';
+  if(t.dataset.f&&v>0){const e0=d.p[0].v;if(t.dataset.f==='e'){const dtp=d.p[1].v-e0,dsl=d.p[2].v-e0;d.p[0].v=v;d.p[1].v=v+dtp;d.p[2].v=v+dsl}
+    else if(t.dataset.f==='tp')d.p[1].v=v;else if(t.dataset.f==='sl')d.p[2].v=v;
+    else if(t.dataset.f==='tpp')d.p[1].v=e0*(1+(lg?1:-1)*v/100);else if(t.dataset.f==='slp')d.p[2].v=e0*(1-(lg?1:-1)*v/100)}
+  if(t.dataset.o&&v>=0){d.o=Object.assign(d.o||{},{[t.dataset.o]:t.dataset.o==='lev'?Math.max(1,Math.round(v)):v})}
+  if(t.dataset.c){d.o=Object.assign(d.o||{},{[t.dataset.c]:t.checked})}
+  if(t.dataset.lk){d.lock=t.checked}
+  saveDR();openDset();ctxShow()};
+$('#dset').onclick=e=>{const b=e.target.closest('button');if(!b)return;const d=DR[selD];if(b.dataset.x){closeDset();return}if(!d)return;
+  if(b.dataset.rm){d.o=Object.assign(d.o||{},{rmode:b.dataset.rm})}else if(b.dataset.sw){d.c=b.dataset.sw}else if(b.dataset.wd){d.w=+b.dataset.wd}else if(b.dataset.ls){d.ls=+b.dataset.ls}
+  else if(b.dataset.def){Object.assign(POS,posO(d));savePos();toast('Сохранено: новые позиции будут с этими настройками');return}
+  saveDR();openDset();ctxShow()};
 function renderDBar(){
   const el=$('#dbar');if(!el)return;
   el.innerHTML=TOOLS.map(([k,ic,nm])=>'<button class="dt'+(tool===k?' on':'')+'" data-k="'+k+'" title="'+nm+'">'+ic+'<small>'+nm+'</small></button>').join('')
@@ -2210,16 +2282,18 @@ function renderDBar(){
    +'<input id="dtxt" placeholder="текст для T" value="'+esc(($('#dtxt')||{}).value||'')+'">'
    +'<button id="dmag" class="dt'+(POS.mag?' on':'')+'" title="Магнит">🧲<small>Магнит</small></button>'
    +((tool==='long'||tool==='short'||(selD>=0&&DR[selD]&&/long|short/.test(DR[selD].k)))?'<label class="dpos">Депозит $<input id="pdep" type="number" min="1" value="'+POS.dep+'"></label><label class="dpos">Риск %<input id="prisk" type="number" min="0.1" step="0.1" value="'+POS.risk+'"></label>':'')
+   +(DR.some(d=>d.hid)?'<button id="dshow">👁 Показать скрытые ('+DR.filter(d=>d.hid).length+')</button>':'')
    +'<button id="ddel"'+(selD<0?' disabled':'')+'>🗑 Удалить</button><button id="dclr">Очистить всё</button>'
    +(tool!=='cur'?'<span class="dhint">'+(tool==='long'||tool==='short'?'Нажмите на цену входа — цель и стоп поставятся сами, потом их можно перетащить за точки':tool==='ruler'?'Протяните пальцем по графику':NPT[tool]===1?'Нажмите на график':NPT[tool]===2?'Проведите пальцем от точки к точке':'Проведите линию, затем нажмите третью точку')+'</span>':'');
 }
 $('#dbar').onclick=e=>{const b=e.target.closest('button');if(!b)return;
   if(b.dataset.k){tool=b.dataset.k;pend=[];hov=null;if(tool!=='ruler')ruler=null;renderDBar()}
   else if(b.dataset.c){dcol=b.dataset.c;if(selD>=0){DR[selD].c=dcol;saveDR()}renderDBar()}
+  else if(b.id==='dshow'){DR.forEach(d=>delete d.hid);saveDR();renderDBar()}
   else if(b.id==='dmag'){POS.mag=!POS.mag;savePos();renderDBar()}
   else if(b.id==='ddel'){if(selD>=0){DR.splice(selD,1);selD=-1;saveDR();renderDBar()}}
   else if(b.id==='dclr'){if(!DR.length)return;if(b.dataset.ok){DR=[];selD=-1;saveDR();renderDBar()}else{b.dataset.ok=1;b.textContent='Точно? Нажмите ещё раз';setTimeout(()=>{if(b.isConnected){delete b.dataset.ok;b.textContent='Очистить всё'}},3000)}}};
-$('#dbar').onchange=e=>{if(e.target.id==='pdep'||e.target.id==='prisk'){const v=+e.target.value;if(v>0){POS[e.target.id==='pdep'?'dep':'risk']=v;savePos()}return}
+$('#dbar').onchange=e=>{if(e.target.id==='pdep'||e.target.id==='prisk'){const v=+e.target.value,k=e.target.id==='pdep'?'dep':'risk';if(v>0){POS[k]=v;savePos();const d=DR[selD];if(d&&/long|short/.test(d.k)){d.o=Object.assign(d.o||{},{[k]:v});saveDR()}}return}
   if(e.target.id==='dwid'){dwid=+e.target.value;if(selD>=0){DR[selD].w=dwid;saveDR()}}};
 $('#dbar').oninput=e=>{if(e.target.id==='dtxt'&&selD>=0&&DR[selD].k==='txt'){DR[selD].txt=e.target.value.slice(0,80);saveDR()}};
 $('#drb').onclick=()=>{const v=$('#dbar').style.display!=='flex';$('#dbar').style.display=v?'flex':'none';$('#drb').classList.toggle('on',v);if(!v){tool='cur';pend=[];ruler=null}renderDBar()};
