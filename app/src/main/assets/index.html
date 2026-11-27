@@ -42,6 +42,7 @@ button{cursor:pointer}
 #main{position:relative;flex:1;min-width:0}
 #chart,#ov,#tvw{position:absolute;inset:0}
 #chart{z-index:0}#ov{pointer-events:none;z-index:1}
+.chb{margin-top:10px}.chbh{display:flex;justify-content:space-between;color:#c9cfdb;font-size:13px}.chbh b{color:#9cc0ff}.chbr{display:flex;gap:8px;align-items:center;margin-top:4px}.chbr input{flex:1;accent-color:#3b82f6;height:28px}.chbr button,.chbp button{background:#1a1f2b;border:1px solid #2a3142;color:#d6dae3;border-radius:9px;min-width:34px;height:30px;font-size:15px}.chbp{display:flex;gap:6px;margin-top:6px}.chbp button{flex:1;font-size:12.5px;white-space:nowrap;height:auto;padding:7px 4px}
 #tvw,#side{display:none}
 #side{width:236px;flex-direction:column;overflow:hidden;border-left:1px solid #1c2230;background:#0f131b;font-size:12px}
 #side .h{display:flex;align-items:center;gap:6px;padding:6px 8px;color:#8b93a7;border-bottom:1px solid #1c2230;white-space:nowrap}
@@ -253,6 +254,9 @@ select,input{outline:none}select:focus,input:focus{border-color:var(--ac)}
     <div class="ptop"><b id="pn"></b><span></span><button id="rst">Сбросить всё</button><button id="pclose">✕</button></div>
     <div class="sec"><h4>📈 График</h4>
       <label>История <select id="hist"><option value="week">Неделя</option><option value="month">Месяц</option><option value="year">Год</option></select></label>
+      <div class="chb"><div class="chbh">Яркость графика <b id="chbv"></b></div>
+        <div class="chbr"><button data-chb="-10">−</button><input id="chbr" type="range" min="0" max="100" step="5"><button data-chb="10">+</button></div>
+        <div class="chbp"><button data-chbs="0">🌙 Тёмный</button><button data-chbs="50">◐ Серый</button><button data-chbs="100">☀️ Светлый</button></div></div>
     </div>
     <div style="display:none"><div class="sec"><h4>🐋 Линии китов на графике</h4>
       <label>Линий на сторону <input id="topn" type="number" min="1" max="50" style="width:60px"></label>
@@ -557,7 +561,7 @@ const chg=(c,cf)=>{
   return 0;
 };
 let pmax=1;
-let VIS=[],visT=0,p95=1,pmed=.1,actShare=1,p95T=0,LM={mc:[0,1],vol:[0,1]},baseTok=0;
+let chT=0,chN=0,VIS=[],visT=0,p95=1,pmed=.1,actShare=1,p95T=0,LM={mc:[0,1],vol:[0,1]},baseTok=0;
 function visible(){
   const cf=cfg(),s=AS.sort;let v=[...coins.values()];v.forEach(c=>{c.st=!isNew(c)&&isStable(c)});
   if(s==='fav')v=v.filter(c=>LISTS.fav.includes(c.s));
@@ -576,12 +580,17 @@ function visible(){
    3) что не нашлось — свечи по каждой монете (не больше 8 запросов одновременно, повтор через 1,5 мин). */
 const RW={},RWS={};let rwT=0;
 /* поток скользящих окон спота (1ч/4ч) — по одному соединению на окно, держим открытыми */
+function rwStop(win){const st=RWS[win];if(!st)return;delete RWS[win];clearInterval(st.tm);try{st.w&&(st.w.onclose=null,st.w.close())}catch(e){}}
+function rwNeed(){const per=cfg().per,need=new Set();if(per==='h1')need.add('1h');if(per==='h4')need.add('4h');if(AS.mkt==='spot'&&AS.bvol!==0)need.add('1h');
+  Object.keys(RWS).forEach(w=>{if(!need.has(w))rwStop(w)});need.forEach(rwStream)}
 function rwStream(win){
   const S0=RWS[win];if(S0&&S0.w&&S0.w.readyState<2)return;
   const st=RWS[win]={w:null,hi:0};
   const urls=['wss://stream.binance.com:9443/ws/!ticker_'+win+'@arr','wss://data-stream.binance.vision/ws/!ticker_'+win+'@arr','wss://stream.binance.com:443/ws/!ticker_'+win+'@arr'];
+  /* сообщение большое (все монеты, ~0,5 МБ/сек) — разбираем только последнее и не чаще раза в 2,5 сек */
+  st.tm=setInterval(()=>{const d=st.raw;if(!d)return;st.raw=null;const m=RW[win]||(RW[win]=new Map()),t=Date.now();try{JSON.parse(d).forEach(x=>m.set(x.s,[+x.o,+x.c,t,+x.q]))}catch(_){}rwT=t},2500);
   const open=()=>{if(RWS[win]!==st)return;let w;try{w=new WebSocket(urls[st.hi%urls.length])}catch(e){return}st.w=w;let got=0;
-    w.onmessage=e=>{got=1;const m=RW[win]||(RW[win]=new Map()),t=Date.now();try{JSON.parse(e.data).forEach(x=>m.set(x.s,[+x.o,+x.c,t,+x.q]))}catch(_){}rwT=t};
+    w.onmessage=e=>{got=1;st.raw=e.data};
     w.onclose=()=>{if(RWS[win]!==st)return;if(!got)st.hi++;setTimeout(open,got?1500:3000)}};
   open();
 }
@@ -589,16 +598,17 @@ function rwStream(win){
    спот: скользящие 60 минут из потока !ticker_1h@arr (все монеты сразу, каждую секунду);
    фьючерсы: поток часовых свечей видимых монет (текущий час вживую) + прошлый час одним запросом раз в час;
    объём за 60 мин ≈ текущий час + та доля прошлого часа, что ещё входит в последние 60 минут. */
-const FK=new Map();let fkSocks=[],fkKey='',fkPrevBusy=false;
+const FK=new Map();let fkSocks=[],fkKey='',fkT=0,fkPrevBusy=false;
 function vol1h(c){
   if(AS.mkt==='spot'){const m=RW['1h'],x=m&&m.get(c.s);return x&&Date.now()-x[2]<120000&&x[3]>=0?x[3]:null}
   const k=FK.get(c.s);if(!k||k.cur==null)return null;const el=Math.min(1,Math.max(0,(Date.now()-k.ot)/36e5));
   return k.prev!=null?k.cur+k.prev*(1-el):(el>.5?k.cur/el:null);
 }
 function volStreams(){
-  if(AS.mkt==='spot'){fkSocks.forEach(w=>{try{w.onclose=null;w.close()}catch(e){}});fkSocks=[];fkKey='';rwStream('1h');return}
-  const syms=VIS.slice().sort((a,b)=>b.vol-a.vol).slice(0,400).map(c=>c.s.toLowerCase()).sort(),key=syms.join(',');
-  if(key===fkKey&&fkSocks.length&&fkSocks.every(w=>w.readyState<2))return;
+  if(AS.mkt==='spot'){fkSocks.forEach(w=>{try{w.onclose=null;w.close()}catch(e){}});fkSocks=[];fkKey='';rwNeed();return}
+  /* объём видно только на крупных пузырях — подписываемся только на них (раньше 400 монет = тысячи сообщений в секунду) */
+  const syms=VIS.filter(c=>c.r>=22).sort((a,b)=>b.r-a.r).slice(0,80).map(c=>c.s.toLowerCase()).sort(),key=syms.join(',');
+  if(fkSocks.length&&fkSocks.every(w=>w.readyState<2)&&(key===fkKey||Date.now()-fkT<6e4))return;fkT=Date.now();
   fkSocks.forEach(w=>{try{w.onclose=null;w.close()}catch(e){}});fkSocks=[];fkKey=key;
   for(let i=0;i<syms.length;i+=150){const part=syms.slice(i,i+150),url=FWS+'/market/stream?streams='+part.map(x=>x+'@kline_1h').join('/');
     const open=()=>{if(fkKey!==key)return;let w;try{w=new WebSocket(url)}catch(e){return}fkSocks.push(w);
@@ -609,7 +619,7 @@ function volStreams(){
 }
 async function volPrev(){ /* прошлый час для фьючерсов: только у тех, где его ещё нет (сначала крупные пузыри) */
   if(AS.mkt!=='fut'||fkPrevBusy)return;fkPrevBusy=true;
-  try{const need=VIS.slice().sort((a,b)=>b.r-a.r).filter(c=>{const k=FK.get(c.s);return !k||k.prev==null||Date.now()-(k.pt||0)>36e5}).slice(0,120);let i=0;
+  try{const need=VIS.filter(c=>c.r>=22).sort((a,b)=>b.r-a.r).filter(c=>{const k=FK.get(c.s);return !k||k.prev==null||Date.now()-(k.pt||0)>36e5}).slice(0,80);let i=0;
     const w=async()=>{while(i<need.length){const c=need[i++];try{const r=await apiK('fut',c.s,'1h',2);if(r&&r.length>=2){const o=FK.get(c.s)||{};o.prev=+r[0][7];if(!o.ot||+r[1][0]>=o.ot){o.ot=+r[1][0];o.cur=+r[1][7]}o.pt=Date.now();FK.set(c.s,o)}}catch(e){}}};
     await Promise.all([w(),w(),w(),w()])}finally{fkPrevBusy=false}
 }
@@ -637,7 +647,7 @@ function spotSet(){
 let baseRun=null,baseErr=0;const BST={per:'',ok:0,tot:0};
 function baseProg(per,w){BST.ok=VIS.filter(c=>c.bp===per||(w&&rwPct(c,w)!=null)).length;updHint()}
 async function ensureBase(){
-  const cf=cfg(),P=PER[cf.per];const RWW={h1:'1h',h4:'4h'}[cf.per];if(RWW)rwStream(RWW);if(AS.bvol!==0){volStreams();volPrev()}
+  const cf=cfg(),P=PER[cf.per];const RWW={h1:'1h',h4:'4h'}[cf.per];rwNeed();if(AS.bvol!==0){volStreams();volPrev()}
   if(!P.b)return;
   const key=AS.mkt+cf.per;if(baseRun===key)return;   /* не перезапускаем, пока идёт загрузка того же периода */
   baseRun=key;const my=++baseTok,mk0=AS.mkt,now=Date.now(),[iv,lim]=P.b;
@@ -717,6 +727,29 @@ const BHL=(()=>{const z=128,o=document.createElement('canvas');o.width=o.height=
   return o})();
 /* какую долю экрана занимают пузыри (плотная упаковка кругов ≈ 0,8) */
 const FILL=.76,BTOP=22;   /* сверху оставляем полоску под надпись «Binance … · N монет» */
+/* заготовки подписей: текст пузыря рисуется один раз и меняется, только когда изменился % или размер */
+function lblSprite(c,lines){
+  const k=lines.map(l=>l.join('|')).join('/');if(c._lb&&c._lb.k===k)return c._lb;
+  const S=dpr,meas=document.createElement('canvas').getContext('2d');let w=2,h=0;
+  lines.forEach(([t,wt,fz])=>{meas.font=wt+' '+fz+'px system-ui';w=Math.max(w,meas.measureText(t).width+4);h+=fz*1.15});
+  const o=c._lb&&c._lb.cv||document.createElement('canvas');o.width=Math.ceil(w*S);o.height=Math.ceil(h*S);const x=o.getContext('2d');
+  x.scale(S,S);x.textAlign='center';x.textBaseline='top';let y=0;
+  lines.forEach(([t,wt,fz,col,gap])=>{x.font=wt+' '+fz+'px system-ui';x.fillStyle=col;x.fillText(t,w/2,y+(gap||0));y+=fz*1.15});
+  return c._lb={k,cv:o,w,h};
+}
+/* заготовки тел пузырей: цвет округляем, яркость — 12 ступеней; рисуем один раз и копируем */
+const BSPR=new Map();
+function bodySprite(col,lv){
+  const q=col.map(v=>Math.round(v/12)*12),L=Math.round(lv*11),key=q.join(',')+'|'+L;let o=BSPR.get(key);if(o)return o;
+  if(BSPR.size>400)BSPR.clear();
+  const Z=160,R=Z/2/1.02,x0=Z/2;o=document.createElement('canvas');o.width=o.height=Z;const x=o.getContext('2d'),rgb=q.join(','),l=L/11;
+  x.translate(x0,x0);const gr=x.createRadialGradient(0,0,R*.35,0,0,R);
+  gr.addColorStop(0,'rgba('+rgb+','+(.015+.06*l)+')');gr.addColorStop(.75,'rgba('+rgb+','+(.04+.2*l)+')');gr.addColorStop(1,'rgba('+rgb+','+(.12+.55*l)+')');
+  x.beginPath();x.arc(0,0,R,0,6.2832);x.fillStyle=gr;x.fill();
+  x.strokeStyle='rgba('+rgb+','+(.14+.86*l)+')';x.lineWidth=Math.max(2,R*(.018+.06*l));x.stroke();
+  x.globalAlpha=.18+.45*l;x.drawImage(BHL,-R,-R,R*2,R*2);x.globalAlpha=1;
+  BSPR.set(key,o);return o;
+}
 const lm=(v,r)=>v>0&&r[1]>r[0]?(Math.log(v)-r[0])/(r[1]-r[0]):0;
 function tickBubbles(){
   requestAnimationFrame(tickBubbles);
@@ -725,7 +758,7 @@ function tickBubbles(){
   if(now-visT>1500){visT=now;VIS=visible();updHint()}
   const a=VIS;bx.clearRect(0,0,W,H);imgBudget=12;
   if(!a.length||W<50||H<50)return;
-  a.forEach(c=>c.ch=chg(c,cf));
+  if(now-chT>250||a.length!==chN){chT=now;chN=a.length;a.forEach(c=>c.ch=chg(c,cf))}
   if(now-p95T>1500){p95T=now;
     const v=a.map(c=>Math.abs(c.ch)).sort((x,y)=>x-y);p95=Math.max(.01,v[Math.floor(v.length*.93)]||.01);pmed=Math.max(.005,v[v.length>>1]||.005);actShare=v.filter(x=>x>pmed*2.5).length/Math.max(1,v.length);pmax=Math.max(.01,v[v.length-1]||.01);
     const lg=k=>{const z=a.map(c=>c[k]).filter(x=>x>0);return z.length?[Math.log(Math.min(...z)),Math.log(Math.max(...z))]:[0,1]};LM={mc:lg('mc'),vol:lg('vol')};
@@ -766,13 +799,16 @@ function tickBubbles(){
     a.forEach(c=>{c.tr=Math.min(rmax,Math.max(rmin,c.rr*s))});
   }
   a.forEach(c=>{c.r+=(c.tr-c.r)*.12;if(c!==(grab&&grab.c)){c.vx+=(W/2-c.x)/W*.025+(Math.random()-.5)*.03;c.vy+=((H+BTOP)/2-c.y)/H*.025+(Math.random()-.5)*.03}});
-  const cs=Math.max(20,2*Math.max(...a.map(c=>c.r))+2),g=new Map();
-  a.forEach(c=>{const k=Math.floor(c.x/cs)+','+Math.floor(c.y/cs);let l=g.get(k);if(!l){l=[];g.set(k,l)}l.push(c)});
-  a.forEach(p=>{const cx=Math.floor(p.x/cs),cy=Math.floor(p.y/cs);
-    for(let ix=-1;ix<=1;ix++)for(let iy=-1;iy<=1;iy++){const l=g.get((cx+ix)+','+(cy+iy));if(!l)continue;
-      for(const q of l){if(q.id<=p.id)continue;
-        let dx=q.x-p.x,dy=q.y-p.y,d=Math.hypot(dx,dy)||1,m=p.r+q.r+1.5;
-        if(d<m){const f=(m-d)*.03;dx/=d;dy/=d;p.vx-=dx*f;p.vy-=dy*f;q.vx+=dx*f;q.vy+=dy*f}}}});
+  /* сетка соседей: клетка по ТИПИЧНОМУ пузырю (а не самому большому — иначе 618 пузырей сравниваются все со всеми);
+     большой пузырь записывается во все клетки, которые накрывает */
+  const rs=a.map(c=>c.r).sort((x,y)=>x-y),cs=Math.max(16,2*rs[Math.floor(rs.length*.9)]+12),g=new Map(),K=(i,j)=>i*8192+j;
+  const gput=c=>{const i0=Math.floor((c.x-c.r-6)/cs),i1=Math.floor((c.x+c.r+6)/cs),j0=Math.floor((c.y-c.r-6)/cs),j1=Math.floor((c.y+c.r+6)/cs);
+    for(let i=i0;i<=i1;i++)for(let j=j0;j<=j1;j++){const k=K(i,j);let l=g.get(k);if(!l){l=[];g.set(k,l)}l.push(c)}};
+  a.forEach(gput);
+  let stamp=0;const near=(p,fn)=>{stamp++;const i0=Math.floor((p.x-p.r-6)/cs),i1=Math.floor((p.x+p.r+6)/cs),j0=Math.floor((p.y-p.r-6)/cs),j1=Math.floor((p.y+p.r+6)/cs);
+    for(let i=i0;i<=i1;i++)for(let j=j0;j<=j1;j++){const l=g.get(K(i,j));if(!l)continue;for(const q of l){if(q.id<=p.id||q._st===stamp)continue;q._st=stamp;fn(q)}}};
+  a.forEach(p=>near(p,q=>{let dx=q.x-p.x,dy=q.y-p.y,d=Math.hypot(dx,dy)||1,m=p.r+q.r+1.5;
+    if(d<m){const f=(m-d)*.03;dx/=d;dy/=d;p.vx-=dx*f;p.vy-=dy*f;q.vx+=dx*f;q.vy+=dy*f}}));
   /* движение: инерция, лёгкое трение, отскок от краёв экрана */
   const G=grab&&grab.c;
   a.forEach(c=>{if(c===G)return;c.vx*=.955;c.vy*=.955;const sp=Math.hypot(c.vx,c.vy);if(sp>45){c.vx*=45/sp;c.vy*=45/sp}c.x+=c.vx;c.y+=c.vy;
@@ -780,9 +816,7 @@ function tickBubbles(){
     if(c.y<c.r+BTOP){c.y=c.r+BTOP;if(c.vy<0)c.vy=-c.vy*.85}else if(c.y>H-c.r){c.y=H-c.r;if(c.vy>0)c.vy=-c.vy*.85}});
   /* жёсткое разведение: пузыри не должны накладываться */
   const pr=[];
-  a.forEach(p=>{const cx=Math.floor(p.x/cs),cy=Math.floor(p.y/cs);
-    for(let ix=-1;ix<=1;ix++)for(let iy=-1;iy<=1;iy++){const l=g.get((cx+ix)+','+(cy+iy));if(!l)continue;
-      for(const q of l){if(q.id<=p.id)continue;if(Math.hypot(q.x-p.x,q.y-p.y)<p.r+q.r+10)pr.push([p,q])}}});
+  a.forEach(p=>near(p,q=>{if(Math.hypot(q.x-p.x,q.y-p.y)<p.r+q.r+10)pr.push([p,q])}));
   /* удары пузырей друг о друга: упругий обмен скоростями (тяжёлые большие толкают маленькие) */
   pr.forEach(([p,q])=>{const dx=q.x-p.x,dy=q.y-p.y,d=Math.hypot(dx,dy)||1;if(d>p.r+q.r+1)return;const nx=dx/d,ny=dy/d,vn=(q.vx-p.vx)*nx+(q.vy-p.vy)*ny;if(vn>=0)return;
     const mp=p===G?1e9:p.r*p.r,mq=q===G?1e9:q.r*q.r,j=-1.8*vn/(1/mp+1/mq);squish(p,nx,ny,-vn*.02*Math.min(1,mq/mp));squish(q,nx,ny,-vn*.02*Math.min(1,mp/mq));if(p!==G){p.vx-=j/mp*nx;p.vy-=j/mp*ny}if(q!==G){q.vx+=j/mq*nx;q.vy+=j/mq*ny}});
@@ -810,15 +844,12 @@ function tickBubbles(){
     /* яркость: активные — ярко (как раньше); неактивные — мутные, тёмные, еле заметная обводка
        (чуть ярче, если всё-таки немного двигаются) — как в Crypto Bubbles */
     const act=c.act||0,lv=act>0?.45+.55*act:.3*Math.min(1,Math.abs(c.ch)/(pmed*3));
-    const gr=bx.createRadialGradient(0,0,r*.35,0,0,r);
-    gr.addColorStop(0,'rgba('+rgb+','+(.015+.06*lv)+')');gr.addColorStop(.75,'rgba('+rgb+','+(.04+.2*lv)+')');gr.addColorStop(1,'rgba('+rgb+','+(.12+.55*lv)+')');
-    bx.beginPath();bx.arc(0,0,r,0,6.2832);bx.fillStyle=gr;bx.fill();
+    /* тело пузыря (заливка + обводка + блик) берём из готовой заготовки — не рисуем заново каждый кадр */
+    bx.drawImage(bodySprite(col,lv),-r*1.02,-r*1.02,r*2.04,r*2.04);
     if(act>.45){const gw=Math.max(1.5,r*.05),pl=act>.9?.75+.25*Math.sin(now/260+c.ph):1;
       for(let i=1;i<=3;i++){bx.strokeStyle='rgba('+rgb+','+((act-.4)*.5/i*pl)+')';bx.lineWidth=gw;bx.beginPath();bx.arc(0,0,r+gw*(i-.4),0,6.2832);bx.stroke()}}
-    bx.beginPath();bx.arc(0,0,r,0,6.2832);
-    bx.strokeStyle='rgba('+rgb+','+(.14+.86*lv)+')';bx.lineWidth=Math.max(1,r*(.018+.06*lv));bx.stroke();
+
     if(c===G){bx.strokeStyle='rgba('+rgb+',.28)';bx.lineWidth=Math.max(2,r*.09);bx.beginPath();bx.arc(0,0,r*1.07,0,6.2832);bx.stroke()}
-    if(r>=6){bx.globalAlpha=.18+.45*lv;bx.drawImage(BHL,-r,-r,r*2,r*2);bx.globalAlpha=1}
     c._lv=lv;
     bx.restore();
     if(isNew(c)){bx.fillStyle='#ffd54f';
@@ -832,15 +863,15 @@ function tickBubbles(){
       bx.fillStyle='#000';bx.font='800 '+fz+'px system-ui';bx.textAlign='center';bx.textBaseline='middle';bx.fillText(lbl,c.x,py+(fz+5)/2);bx.globalAlpha=1}
     if(r<5)return;
     const lg=logoOf(c);
-    if(r<16){if(lg){const z=r*1.25;bx.drawImage(lg,c.x-z/2,c.y-z/2,z,z)}else if(r>=8){const fz=Math.max(6,Math.min(r*.6,(r*1.8)/(Math.max(2,c.n.length)*.62)));bx.fillStyle='#fff';bx.textAlign='center';bx.textBaseline='middle';bx.font='700 '+fz+'px system-ui';bx.fillText(c.n,c.x,c.y)}return}
-    const vh=AS.bvol!==0&&r>=27?vol1h(c):null,hasV=vh!=null;
-    const big=r>=26,hasC=r>=20,fs=Math.min(Math.max(9,r*(big?.3:.34)),(r*1.7)/(Math.max(3,c.n.length)*.62)),ls=lg?r*(big?.6:.62)*(hasV?.72:1):0;
-    const th=ls+(lg?3:0)+fs*1.15*(hasC?2:1)+(hasV?fs*.8:0);let y0=c.y-th/2;
+    const rq=Math.round(c.r*2)/2;   /* размер подписи — по «спокойному» радиусу (без дыхания), чтобы не перерисовывать каждый кадр */
+    if(r<16){if(lg){const z=r*1.25;bx.drawImage(lg,c.x-z/2,c.y-z/2,z,z)}else if(r>=8){const fz=Math.round(Math.max(6,Math.min(rq*.6,(rq*1.8)/(Math.max(2,c.n.length)*.62)))*2)/2;
+      const L=lblSprite(c,[[c.n,'700',fz,'#fff']]);bx.drawImage(L.cv,c.x-L.w/2,c.y-L.h/2,L.w,L.h)}return}
+    const vh=AS.bvol!==0&&rq>=27?vol1h(c):null,hasV=vh!=null;
+    const big=rq>=26,hasC=rq>=20,fs=Math.round(Math.min(Math.max(9,rq*(big?.3:.34)),(rq*1.7)/(Math.max(3,c.n.length)*.62))*2)/2,ls=lg?r*(big?.6:.62)*(hasV?.72:1):0;
+    const lines=[[c.n,'700',fs,'#fff']];if(hasC)lines.push([contentOf(c,cf),'500',Math.round(fs*1.56)/2,'rgba(255,255,255,.85)']);if(hasV)lines.push(['1ч '+fmtM(vh,1),'600',Math.round(fs*1.24)/2,'rgba(255,213,79,.9)',1]);
+    const L=lblSprite(c,lines),th=ls+(lg?3:0)+L.h;let y0=c.y-th/2;
     if(lg){bx.drawImage(lg,c.x-ls/2,y0,ls,ls);y0+=ls+3}
-    bx.fillStyle='#fff';bx.textAlign='center';bx.textBaseline='top';
-    bx.font='700 '+fs+'px system-ui';bx.fillText(c.n,c.x,y0);
-    if(hasC){bx.font='500 '+(fs*.78)+'px system-ui';bx.fillStyle='rgba(255,255,255,.85)';bx.fillText(contentOf(c,cf),c.x,y0+fs*1.15)}
-    if(hasV){bx.font='600 '+(fs*.62)+'px system-ui';bx.fillStyle='rgba(255,213,79,.9)';bx.fillText('1ч '+fmtM(vh,1),c.x,y0+fs*1.15*(hasC?2:1)+1)}
+    bx.drawImage(L.cv,c.x-L.w/2,y0,L.w,L.h);
   });
   ripples.forEach(w=>{const k=(now-w.t)/700,rr=w.r0?w.r0*(1+.6*k):(w.big?Math.min(W,H)*.5:60)*k;bx.beginPath();bx.arc(w.x,w.y,rr,0,6.2832);bx.strokeStyle='rgba(120,170,255,'+(.5*(1-k))+')';bx.lineWidth=w.big?3:2;bx.stroke()});
 }
@@ -1467,6 +1498,7 @@ async function openChart(sym,view){
       localization:{locale:'ru-RU',timeFormatter:t=>{const d=new Date(t*1000),D=p2(d.getDate())+' '+MON[d.getMonth()]+" '"+String(d.getFullYear()).slice(2);return /^1[dw]$/.test(S.tf)?D:D+'  '+p2(d.getHours())+':'+p2(d.getMinutes())}},
       timeScale:{timeVisible:true,secondsVisible:false,borderColor:'#2a2e39',rightOffset:8,tickMarkFormatter:(t,k)=>{const d=new Date(t*1000);return k===0?String(d.getFullYear()):k===1?MON[d.getMonth()]:k===2?String(d.getDate()):p2(d.getHours())+':'+p2(d.getMinutes())}},
       crosshair:{mode:0,vertLine:{color:'#758696',style:3,labelBackgroundColor:'#2a2e39'},horzLine:{color:'#758696',style:3,labelBackgroundColor:'#2a2e39'}}});
+    chartTheme();
     series=chart.addCandlestickSeries({upColor:'#26a69a',downColor:'#ef5350',wickUpColor:'#26a69a',wickDownColor:'#ef5350',borderVisible:false,
       autoscaleInfoProvider:o=>{let r=o();if(r&&r.priceRange&&BRKR&&BRKR.s===cur)r={priceRange:{minValue:Math.min(r.priceRange.minValue,BRKR.lo),maxValue:Math.max(r.priceRange.maxValue,BRKR.hi)},margins:r.margins};if(!S.fit||!bookLo||!bookHi||!r||!r.priceRange)return r;return{priceRange:{minValue:Math.min(r.priceRange.minValue,bookLo),maxValue:Math.max(r.priceRange.maxValue,bookHi)},margins:r.margins}}});
     vol=chart.addHistogramSeries({priceFormat:{type:'volume'},priceScaleId:'vol',lastValueVisible:false,priceLineVisible:false});
@@ -1790,6 +1822,20 @@ function szCoinRender(){
     +(Z.length?'':'<div class="szn">Сильных зон рядом не найдено</div>')
     +'<div class="szn">Полоска — сила зоны: киты в стакане, прошлые объёмы и развороты. Обновляется каждые 15 сек.</div>';
 }
+/* ---------- яркость графика: 0 — тёмный (как раньше), 100 — светлый ---------- */
+let CHB=+LS.get('cbChB',0)||0;
+function chartTheme(){
+  const t=CHB/100,mix=(a,b)=>Math.round(a+(b-a)*t),bg='rgb('+mix(19,255)+','+mix(23,255)+','+mix(34,255)+')',lt=t>=.5;
+  const grid=lt?'rgba(0,0,0,'+(.04+.06*t)+')':'rgba(42,46,57,'+(.6-.3*t)+')',bd=lt?'#d0d4dc':'#2a2e39';
+  $('#cv').style.background=bg;
+  if(chart)chart.applyOptions({layout:{background:{color:bg},textColor:lt?'#2a2e39':'#d1d4dc'},grid:{vertLines:{color:grid},horzLines:{color:grid}},
+    rightPriceScale:{borderColor:bd},timeScale:{borderColor:bd},crosshair:{vertLine:{labelBackgroundColor:lt?'#5d6673':'#2a2e39'},horzLine:{labelBackgroundColor:lt?'#5d6673':'#2a2e39'}}});
+  const r=$('#chbr'),v=$('#chbv');if(r)r.value=CHB;if(v)v.textContent=CHB===0?'тёмный':CHB===100?'светлый':CHB+'%';
+}
+function setCHB(v){CHB=Math.max(0,Math.min(100,Math.round(v/5)*5));LS.set('cbChB',CHB);chartTheme()}
+$('#panel').addEventListener('input',e=>{if(e.target.id==='chbr')setCHB(+e.target.value)});
+$('#panel').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.chb)setCHB(CHB+ +b.dataset.chb);else if(b.dataset.chbs)setCHB(+b.dataset.chbs)});
+chartTheme();
 /* ---------- авто-фигуры теханализа ---------- */
 let PATS=[],patT=0,PSRC=null,PC=null,pcT=0,pcKey='';
 const patTf=()=>{const t=S.ptf||'4h';return t==='chart'?S.tf:t};
