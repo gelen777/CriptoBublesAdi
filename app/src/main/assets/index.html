@@ -1951,21 +1951,32 @@ function findPats(cc){
   }
   /* чаша с ручкой */
   if(S.pcu){
+    /* чаша с ручкой — правила О'Нила / Булковского:
+       1) перед левым краем был рост (цена пришла снизу);
+       2) глубина 12–50% от цены края и ≥ 3 ATR; края на одном уровне (разница ≤ 15% глубины);
+       3) форма «U», а не «V»: в нижней трети чаши цена провела ≥ 25% времени, дно не одна свеча;
+       4) ручка — только если после правого края есть откат ≥ 3 свечей, в верхней половине чаши (≤ 50% глубины),
+          короче трети чаши; без ручки фигура подписывается «Чаша — ручка ещё не сформирована»;
+       5) после пробоя края цель = край + глубина; если цель достигнута или цена ушла под дно ручки — фигуры нет. */
     for(const W of [150,110,80,50]){
-      const s=n-1-W;if(s<1)continue;
-      let Li=s;for(let i=s;i<=s+W*.3;i++)if(c[i].h>c[Li].h)Li=i;
+      const s0=n-1-W;if(s0<1)continue;
+      let Li=s0;for(let i=s0;i<=s0+W*.3;i++)if(c[i].h>c[Li].h)Li=i;
       let Bi=Li;for(let i=Li;i<n;i++)if(c[i].l<c[Bi].l)Bi=i;
       let Ri=Bi;for(let i=Bi;i<n;i++)if(c[i].h>c[Ri].h)Ri=i;
-      const Lp=c[Li].h,Bp=c[Bi].l,Rp=c[Ri].h,d=Lp-Bp;
-      if(d<3*atr||Bi-Li<W*.2||Ri-Bi<W*.2||Math.abs(Rp-Lp)>.15*d)continue;
-      let mid=0,k=0;const a=Li+Math.round((Ri-Li)/3),b=Li+Math.round(2*(Ri-Li)/3);for(let i=a;i<=b;i++){mid+=c[i].l;k++}
-      if(mid/k>Bp+.45*d)continue;   // форма «V», а не чаша
-      let hl=Infinity;for(let i=Ri+1;i<n;i++)hl=Math.min(hl,c[i].l);
-      const hn=n-1-Ri,pb=hl===Infinity?0:(Rp-hl)/d;
-      if(hn>W*.3||pb>.5)continue;
-      const rim=Math.max(Lp,Rp),up=last>rim+.1*atr;
-      out.push({k:'cup',short:'Чаша с ручкой',col:'0,188,212',cup:[Li,Lp,Bi,Bp,Ri,Rp],lines:[[Li,rim,n-1,rim]],dash:1,
-        lab:{i:Ri,p:rim,t:'◡ Чаша'+(hn>=2&&pb>.05?' с ручкой':'')+' — '+(up?'ПРОБОЙ ВВЕРХ':'возможен пробой вверх')}});
+      const Lp=c[Li].h,Bp=c[Bi].l,Rp=c[Ri].h,d=Lp-Bp,cw=Ri-Li;
+      if(d<3*atr||d/Lp<.12||d/Lp>.5||Bi-Li<W*.2||Ri-Bi<W*.2||Math.abs(Rp-Lp)>.15*d)continue;
+      let pre=Infinity;for(let i=Math.max(0,Li-Math.round(cw*.6));i<Li;i++)pre=Math.min(pre,c[i].l);if(!(pre<Lp-.3*d))continue;   /* (1) */
+      let low3=0;for(let i=Li;i<=Ri;i++)if(c[i].l<Bp+d/3)low3++;if(low3<cw*.25||low3<4)continue;                              /* (3) */
+      let hl=Infinity,hli=-1;for(let i=Ri+1;i<n;i++)if(c[i].l<hl){hl=c[i].l;hli=i}
+      const hn=n-1-Ri,pb=hl===Infinity?0:(Rp-hl)/d,rim=Math.max(Lp,Rp);
+      if(pb>.5||hn>cw/3)continue;                                                                                                 /* (4) */
+      const hasH=hn>=3&&pb>=.08,up=last>rim+.1*atr;
+      if(up&&Math.max(...c.slice(Ri).map(x=>x.h))>=rim+d)continue;                                                               /* (5) */
+      /* линия чаши по ценам: сглаженные минимумы, края — по вершинам */
+      const pts=[];for(let i=Li;i<=Ri;i++){let m=0,q=0;for(let j=Math.max(Li,i-3);j<=Math.min(Ri,i+3);j++){m+=c[j].l;q++}pts.push([i,m/q-.25*atr])}   /* чуть ниже свечей, чтобы не закрывать их */
+      pts[0]=[Li,Lp];pts[pts.length-1]=[Ri,Rp];
+      out.push({k:'cup',short:'Чаша с ручкой',col:'0,188,212',cup:[Li,Lp,Bi,Bp,Ri,Rp],path:pts,lines:[[Li,rim,n-1,rim]].concat(up?[[Ri,rim+d,n-1,rim+d]]:[]),dash:1,
+        lab:{i:Ri,p:rim,t:'◡ '+(hasH?'Чаша с ручкой':'Чаша')+' — '+(up?'ПРОБОЙ ВВЕРХ, цель '+fPr(rim+d):hasH?'пробой при выходе выше '+fPr(rim):'ручка ещё не сформирована')}});
       break;
     }
   }
@@ -2016,7 +2027,9 @@ function drawPats(w,h,right){
     (P.lines||[]).forEach(([i1,p1,i2,p2])=>{if(i2===N-1&&i2>i1){p2=p1+(p2-p1)/(i2-i1)*(fiEnd-i1)}const x1=X(i1),x2=X(i2),y1=Y(p1),y2=Y(p2);if(x1==null||x2==null||y1==null||y2==null)return;ox.beginPath();ox.moveTo(x1,y1);ox.lineTo(x2,y2);ox.stroke()});
     ox.setLineDash([]);
     if(P.box){const [i1,i2,lo,hi]=P.box,x1=X(i1),x2=X(i2),y1=Y(hi),y2=Y(lo);if(x1!=null&&x2!=null&&y1!=null&&y2!=null){ox.fillStyle=`rgba(${col},.10)`;ox.fillRect(x1,y1,x2-x1,y2-y1);ox.strokeStyle=`rgba(${col},.8)`;ox.lineWidth=1.2;ox.strokeRect(x1,y1,x2-x1,y2-y1)}}
-    if(P.cup){const [a,ap,b,bp,r,rp]=P.cup,xa=X(a),xb=X(b),xr=X(r),ya=Y(ap),yb=Y(bp),yr=Y(rp);if([xa,xb,xr,ya,yb,yr].every(v=>v!=null)){ox.strokeStyle=`rgba(${col},.95)`;ox.lineWidth=2.5;ox.beginPath();ox.moveTo(xa,ya);ox.bezierCurveTo(xa+(xb-xa)*.35,yb+(yb-ya)*.25,xb-(xb-xa)*.3,yb,xb,yb);ox.bezierCurveTo(xb+(xr-xb)*.3,yb,xr-(xr-xb)*.35,yb+(yb-yr)*.25,xr,yr);ox.stroke()}}
+    if(P.path){const Q=P.path.map(([i,v])=>[X(i),Y(v)]).filter(q=>q[0]!=null&&q[1]!=null);if(Q.length>2){ox.strokeStyle=`rgba(${col},.95)`;ox.lineWidth=2.5;ox.beginPath();ox.moveTo(Q[0][0],Q[0][1]);
+      for(let k=1;k<Q.length-1;k++){const mx=(Q[k][0]+Q[k+1][0])/2,my=(Q[k][1]+Q[k+1][1])/2;ox.quadraticCurveTo(Q[k][0],Q[k][1],mx,my)}ox.lineTo(Q[Q.length-1][0],Q[Q.length-1][1]);ox.stroke()}}
+    else if(P.cup){const [a,ap,b,bp,r,rp]=P.cup,xa=X(a),xb=X(b),xr=X(r),ya=Y(ap),yb=Y(bp),yr=Y(rp);if([xa,xb,xr,ya,yb,yr].every(v=>v!=null)){ox.strokeStyle=`rgba(${col},.95)`;ox.lineWidth=2.5;ox.beginPath();ox.moveTo(xa,ya);ox.bezierCurveTo(xa+(xb-xa)*.35,yb+(yb-ya)*.25,xb-(xb-xa)*.3,yb,xb,yb);ox.bezierCurveTo(xb+(xr-xb)*.3,yb,xr-(xr-xb)*.35,yb+(yb-yr)*.25,xr,yr);ox.stroke()}}
     if(P.pts)P.pts.forEach(q=>{const x=X(q.i),y=Y(q.p);if(x==null||y==null)return;ox.fillStyle=`rgba(${col},1)`;ox.beginPath();ox.arc(x,y,4,0,6.2832);ox.fill()});
     const L=P.lab;if(L){const x=X(L.i),y=Y(L.p),ic=L.t.split(' ')[0];if(x!=null&&y!=null&&ic.length<=2){ox.fillStyle=`rgb(${col})`;ox.textAlign='center';ox.font='700 13px system-ui';ox.fillText(ic,x,Math.max(10,y-12));ox.font='600 11px system-ui'}}
   });
@@ -2190,7 +2203,7 @@ function finishD(){
       const D=DR[drag.i];D.p=drag.orig.map((q,j)=>drag.hp<0||drag.hp===j?{t:q.t+dt,v:q.v+dv}:q);
       if(drag.hp>=0&&drag.hp<3&&D.k!=='long'&&D.k!=='short'){const S2=snapPt({x:P.x,y:P.y,t:drag.orig[drag.hp].t+dt,v:drag.orig[drag.hp].v+dv});D.p[drag.hp]={t:S2.t,v:S2.v}}
       if(D.k==='long'||D.k==='short'){const O=drag.orig;D.p=O.map(q=>({...q}));   /* цель/стоп/вход двигаются только по цене — ширина не меняется сама */
-        if(drag.hp===0)D.p[0].v=snapPt(P).v;
+        if(drag.hp===0){D.p[0].v=snapPt(P).v;D.p[0].t=Math.min(O[0].t+dt,O[1].t-barSec())}   /* левая ручка: цена входа + начало позиции (правый край на месте) */
         else if(drag.hp===1)D.p[1].v=O[1].v+dv;
         else if(drag.hp===2)D.p[2].v=O[2].v+dv;
         else if(drag.hp===3){const t=Math.max(O[0].t+barSec(),O[1].t+dt);D.p[1].t=D.p[2].t=t}
