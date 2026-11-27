@@ -1971,11 +1971,30 @@ function findPats(cc){
   }
   /* двойная вершина / дно */
   if(S.pdb){
-    const dbl=(P,top)=>{if(P.length<2)return;const A=P[P.length-2],B=P[P.length-1];if(B.i-A.i<8||n-1-B.i>30||Math.abs(A.p-B.p)>.5*atr)return;
-      let nk=top?Infinity:-Infinity;for(let i=A.i;i<=B.i;i++)nk=top?Math.min(nk,c[i].l):Math.max(nk,c[i].h);
-      if(Math.abs(A.p-nk)<2*atr)return;const br=top?last<nk-.1*atr:last>nk+.1*atr;
-      out.push({k:'dbl',short:top?'Двойная вершина':'Двойное дно',col:top?'239,83,80':'38,166,154',pts:[A,B],lines:[[A.i,nk,n-1,nk]],dash:1,
-        lab:{i:B.i,p:B.p,t:(top?'⋀⋀ Двойная вершина — ':'⋁⋁ Двойное дно — ')+(br?'ПРОБОЙ ШЕИ':'при пробое линии шеи '+(top?'вниз':'вверх'))}})};
+    /* правила классической фигуры (Булковский / автофигуры TradingView):
+       1) перед первой вершиной был рост (перед первым дном — падение) — цена пришла из-за линии шеи;
+       2) вершины на одном уровне (разница ≤ 0,5 ATR и ≤ 30% высоты), между ними нет более высоких цен;
+       3) провал между ними глубокий: ≥ 2 ATR и ≥ 2,5% цены; расстояние между вершинами ≥ 8 свечей;
+       4) после второй вершины цена НЕ закрывалась выше вершин (иначе фигура сломана — как у THE: вершины пробиты вверх);
+       5) пробой шеи свежий (не дальше ширины фигуры) и цель (высота фигуры от шеи) ещё не достигнута. */
+    const dbl=(P,top)=>{
+      for(let k=P.length-1;k>=1;k--){const B=P[k];if(n-1-B.i>40)break;
+        for(let j=k-1;j>=0;j--){const A=P[j],wd=B.i-A.i;if(wd<8)continue;if(wd>70)break;
+          const pk=top?Math.max(A.p,B.p):Math.min(A.p,B.p);
+          let nk=top?Infinity:-Infinity,ni=A.i,ok=true;
+          for(let i=A.i+1;i<B.i;i++){const x=top?c[i].l:c[i].h;if(top?x<nk:x>nk){nk=x;ni=i}if(top?c[i].h>pk+.15*atr:c[i].l<pk-.15*atr){ok=false;break}}
+          if(!ok)continue;const ht=Math.abs(pk-nk);
+          if(ht<Math.max(2*atr,pk*.025)||Math.abs(A.p-B.p)>Math.min(.5*atr+ht*.1,ht*.3))continue;
+          /* (1) пришли из-за шеи */
+          let pre=false;for(let i=Math.max(0,A.i-Math.max(10,wd));i<A.i;i++)if(top?c[i].l<nk:c[i].h>nk){pre=true;break}if(!pre)continue;
+          /* (4) не сломана: после второй вершины нет закрытий за вершинами */
+          let broken=false,bi=-1;for(let i=B.i+1;i<n;i++){if(top?c[i].c>pk+.1*atr:c[i].c<pk-.1*atr){broken=true;break}if(bi<0&&(top?c[i].c<nk-.1*atr:c[i].c>nk+.1*atr))bi=i}
+          if(broken)continue;
+          const tg=top?nk-ht:nk+ht,br=bi>=0;
+          if(br&&(n-1-bi>wd||(top?Math.min(...c.slice(bi).map(x=>x.l))<=tg:Math.max(...c.slice(bi).map(x=>x.h))>=tg)))continue;   /* (5) */
+          out.push({k:'dbl',short:top?'Двойная вершина':'Двойное дно',col:top?'239,83,80':'38,166,154',pts:[A,B],lines:[[A.i,nk,n-1,nk],[B.i,tg,n-1,tg]],dash:1,
+            lab:{i:B.i,p:B.p,t:(top?'⋀⋀ Двойная вершина — ':'⋁⋁ Двойное дно — ')+(br?'ПРОБОЙ ШЕИ, цель '+fPr(tg):'при пробое шеи '+fPr(nk)+(top?' вниз':' вверх'))}});
+          return}}};
     dbl(H,true);dbl(L,false);
   }
   return out;
