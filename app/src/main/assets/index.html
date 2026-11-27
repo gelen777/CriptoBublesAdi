@@ -1245,6 +1245,7 @@ async function openBrk(sym){
   const r=BRK.res.find(x=>x.s===sym);brkTfNext=BRK.tf||BRK.cfg.tf;await openChart(sym);if(!r)return;
   for(let i=0;i<60&&(!series||cur!==sym);i++)await new Promise(z=>setTimeout(z,100));
   if(!series||cur!==sym)return;clrBrkLine();
+  try{showRecent(90)}catch(e){}
   brkLine=series.createPriceLine({price:r.lv,color:r.dir==='up'?'#26dc96':'#ff4646',lineWidth:2,lineStyle:0,axisLabelVisible:true,title:'🎯 пробой '+(r.dir==='up'?'вверх':'вниз')});
   const t=r.tg;if(t){if(t.tp!=null)brkLines.push(series.createPriceLine({price:t.tp,color:'#ffd54f',lineWidth:2,lineStyle:2,axisLabelVisible:true,title:'цель 1'}));
     if(t.tp2!=null)brkLines.push(series.createPriceLine({price:t.tp2,color:'#ffd54f',lineWidth:1,lineStyle:2,axisLabelVisible:true,title:'цель 2'}));
@@ -1543,7 +1544,8 @@ async function load(){
   series.applyOptions({priceFormat:{type:'price',precision:p,minMove:1/10**p}});
   prec=p;candles=k.map(r=>({t:r[0]/1000,o:+r[1],h:+r[2],l:+r[3],c:+r[4],v:+r[5]}));{const q=k[k.length-1];lastC={time:q[0]/1000,open:+q[1],high:+q[2],low:+q[3],close:+q[4]}}vol.setData(k.map(r=>({time:r[0]/1000,value:+r[5],color:+r[4]>=+r[1]?'rgba(38,166,154,.5)':'rgba(239,83,80,.5)'})));legend();series.setData(k.map(r=>({time:r[0]/1000,open:+r[1],high:+r[2],low:+r[3],close:+r[4]})));
   loadDR();indDirty=1;
-  {const t1=candles[candles.length-1].t;try{chart.applyOptions({timeScale:{minBarSpacing:0.05}});chart.timeScale().setVisibleRange({from:Math.max(candles[0].t,t1-Math.max(HD*86400,TS*60)),to:t1})}catch(e){chart.timeScale().scrollToRealTime()}}
+  /* при открытии — последние ~120 свечей (как в TradingView): цена в центре, а не прижата в угол из-за старых цен; историю можно листать влево */
+  try{chart.applyOptions({timeScale:{minBarSpacing:0.05}});showRecent()}catch(e){chart.timeScale().scrollToRealTime()}
   const keep=()=>{if(my!==gen||candles.length<2)return;KC.delete(ck);KC.set(ck,candles.map(x=>[x.t*1000,x.o,x.h,x.l,x.c,x.v]));while(KC.size>16)KC.delete(KC.keys().next().value)};
   if(fromCache)(async()=>{try{
     const fr=await kHist(CM,sym,tf,1000,0,()=>my===gen);if(my!==gen||!fr.length)return;
@@ -1561,7 +1563,7 @@ async function load(){
     series.setData(candles.map(x=>({time:x.t,open:x.o,high:x.h,low:x.l,close:x.c})));
     vol.setData(candles.map(x=>({time:x.t,value:x.v||0,color:x.c>=x.o?'rgba(38,166,154,.5)':'rgba(239,83,80,.5)'})));
     indDirty=1;patT=0;keep();
-    const t1=candles[candles.length-1].t;try{chart.timeScale().setVisibleRange({from:Math.max(candles[0].t,t1-Math.max(HD*86400,TS*60)),to:t1})}catch(e){}
+    try{showRecent()}catch(e){}
   }catch(e){}})();
   let buf=[];lastDepth=0;startStats(sym,my);
   let got=false;const fut=CM==='fut';
@@ -1837,6 +1839,7 @@ function szCoinRender(){
     +(Z.length?'':'<div class="szn">Сильных зон рядом не найдено</div>')
     +'<div class="szn">Полоска — сила зоны: киты в стакане, прошлые объёмы и развороты. Обновляется каждые 15 сек.</div>';
 }
+function showRecent(nb){const n=candles.length;if(!n||!chart)return;nb=nb||120;chart.timeScale().setVisibleLogicalRange({from:Math.max(-5,n-nb),to:n+6});try{series.priceScale().applyOptions({autoScale:true})}catch(e){}}
 /* ---------- яркость графика: 0 — тёмный (как раньше), 100 — светлый ---------- */
 let CHB=+LS.get('cbChB',0)||0;
 function chartTheme(){
