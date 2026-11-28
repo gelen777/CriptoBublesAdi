@@ -1971,14 +1971,22 @@ function findPats(cc){
       if(d<3*atr||d/Lp<.12||d/Lp>.5||Bi-Li<W*.2||Ri-Bi<W*.2||Math.abs(Rp-Lp)>.15*d)continue;
       let pre=Infinity;for(let i=Math.max(0,Li-Math.round(cw*.6));i<Li;i++)pre=Math.min(pre,c[i].l);if(!(pre<Lp-.3*d))continue;   /* (1) */
       let low3=0;for(let i=Li;i<=Ri;i++)if(c[i].l<Bp+d/3)low3++;if(low3<cw*.25||low3<4)continue;                              /* (3) */
+      /* (3б) одно округлое дно, а не «W»: внутри чаши нет промежуточного подъёма выше середины глубины,
+         и цены по обе стороны от дна в целом идут вниз, потом вверх (форма близка к параболе) */
+      let midPk=-Infinity;for(let i=Li+Math.round(cw*.15);i<=Ri-Math.round(cw*.15);i++)if(Math.abs(i-Bi)>cw*.08)midPk=Math.max(midPk,c[i].h);
+      const sideL=c.slice(Li,Bi+1),sideR=c.slice(Bi,Ri+1);
+      const tooHigh=(arr,from,to,rev)=>{let bad=0;arr.forEach((x,k)=>{const f=(rev?k:arr.length-1-k)/Math.max(1,arr.length-1),u=Bp+(to-Bp)*f*f;if(x.h>u+.45*d)bad++});return bad/arr.length};
+      if(tooHigh(sideL,Bp,Lp,false)>.12||tooHigh(sideR,Bp,Rp,true)>.12)continue;
+      let fitE=0;for(let i=Li;i<=Ri;i++){const t=i<=Bi?(Bi-i)/Math.max(1,Bi-Li):(i-Bi)/Math.max(1,Ri-Bi),u=Bp+((i<=Bi?Lp:Rp)-Bp)*t*t,m=(c[i].h+c[i].l)/2;fitE+=Math.abs(m-u)}
+      if(fitE/(cw+1)>.22*d)continue;
       let hl=Infinity,hli=-1;for(let i=Ri+1;i<n;i++)if(c[i].l<hl){hl=c[i].l;hli=i}
       const hn=n-1-Ri,pb=hl===Infinity?0:(Rp-hl)/d,rim=Math.max(Lp,Rp);
       if(pb>.5||hn>cw/3)continue;                                                                                                 /* (4) */
       const hasH=hn>=3&&pb>=.08,up=last>rim+.1*atr;
       if(up&&Math.max(...c.slice(Ri).map(x=>x.h))>=rim+d)continue;                                                               /* (5) */
       /* линия чаши по ценам: сглаженные минимумы, края — по вершинам */
-      const pts=[];for(let i=Li;i<=Ri;i++){let m=0,q=0;for(let j=Math.max(Li,i-3);j<=Math.min(Ri,i+3);j++){m+=c[j].l;q++}pts.push([i,m/q-.25*atr])}   /* чуть ниже свечей, чтобы не закрывать их */
-      pts[0]=[Li,Lp];pts[pts.length-1]=[Ri,Rp];
+      /* плавная «U»: от левого края к дну и к правому краю по параболе (не повторяет каждую свечу и не проваливается ниже дна) */
+      const pts=[];for(let i=Li;i<=Ri;i++){const t=i<=Bi?(Bi-i)/Math.max(1,Bi-Li):(i-Bi)/Math.max(1,Ri-Bi),top=i<=Bi?Lp:Rp;pts.push([i,Bp-.2*atr+(top-Bp+.2*atr)*Math.pow(t,1.8)])}
       out.push({k:'cup',short:'Чаша с ручкой',col:'0,188,212',cup:[Li,Lp,Bi,Bp,Ri,Rp],path:pts,lines:[[Li,rim,n-1,rim]].concat(up?[[Ri,rim+d,n-1,rim+d]]:[]),dash:1,
         lab:{i:Ri,p:rim,t:'◡ '+(hasH?'Чаша с ручкой':'Чаша')+' — '+(up?'ПРОБОЙ ВВЕРХ, цель '+fPr(rim+d):hasH?'пробой при выходе выше '+fPr(rim):'ручка ещё не сформирована')}});
       break;
