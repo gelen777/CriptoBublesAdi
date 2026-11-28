@@ -2117,11 +2117,19 @@ const DCOL=['#2962ff','#ffd54f','#26a69a','#ef5350','#ab47bc','#ff9800','#ffffff
 const FIBL=[0,.236,.382,.5,.618,.786,1,1.618];
 let DR=[],tool='cur',pend=[],hov=null,selD=-1,drag=null,dcol='#2962ff',dwid=2,ruler=null,pdown=null;
 /* настройки позиции (депозит и риск на сделку) и магнит к свечам */
-const POS=Object.assign({dep:1000,risk:1,rmode:'%',lev:1,fee:0.05,compact:false,ext:false,usd:true,mag:true},LS.get('cbPos',{}));const savePos=()=>LS.set('cbPos',POS);
-const posO=d=>Object.assign({dep:POS.dep,risk:POS.risk,rmode:POS.rmode,lev:POS.lev,fee:POS.fee,compact:POS.compact,ext:POS.ext,usd:POS.usd},d.o||{});
+const POS=Object.assign({smode:'mar',mar:100,dep:1000,risk:1,rmode:'%',lev:1,fee:0.05,compact:false,ext:false,usd:true,mag:true},LS.get('cbPos',{}));const savePos=()=>LS.set('cbPos',POS);
+const posO=d=>Object.assign({smode:POS.smode,mar:POS.mar,dep:POS.dep,risk:POS.risk,rmode:POS.rmode,lev:POS.lev,fee:POS.fee,compact:POS.compact,ext:POS.ext,usd:POS.usd},d.o||{});
 /* расчёт позиции: объём по риску, прибыль/убыток с комиссией, маржа по плечу */
-function posCalc(d){const o=posO(d),e=d.p[0].v,tp=d.p[1].v,sl=d.p[2].v,risk=o.rmode==='$'?o.risk:o.dep*o.risk/100,qty=Math.abs(e-sl)>0?risk/Math.abs(e-sl):0,
-  notional=qty*e,fee=notional*o.fee/100*2,prof=qty*Math.abs(tp-e)-fee,loss=risk+fee;return {o,e,tp,sl,risk,qty,notional,fee,prof,loss,rr:loss>0?prof/loss:0,margin:notional/Math.max(1,o.lev)}}
+/* два способа задать размер (как на бирже):
+   «Сумма входа» — вкладываете маржу $M с плечом xL → позиция M·L, прибыль/убыток растут вместе с плечом;
+   «По риску» — задаёте, сколько готовы потерять на стопе, а объём считается от расстояния до стопа (плечо меняет только маржу).
+   Ликвидация (изолированная маржа, поддержка 0,5%): лонг e·(1−1/L+0,005), шорт e·(1+1/L−0,005). */
+function posCalc(d){const o=posO(d),e=d.p[0].v,tp=d.p[1].v,sl=d.p[2].v,lg=d.k==='long',lev=Math.max(1,o.lev||1);let qty;
+  if(o.smode==='risk'){const risk=o.rmode==='$'?o.risk:o.dep*o.risk/100;qty=Math.abs(e-sl)>0?risk/Math.abs(e-sl):0}else qty=e>0?o.mar*lev/e:0;
+  const notional=qty*e,margin=notional/lev,fee=notional*o.fee/100*2,prof=qty*Math.abs(tp-e)-fee;let loss=qty*Math.abs(e-sl)+fee;const 
+    liq=lev>1?(lg?e*(1-1/lev+.005):e*(1+1/lev-.005)):null,liqFirst=liq!=null&&(lg?liq>=sl:liq<=sl);
+  if(liqFirst)loss=margin+fee;   /* ликвидация раньше стопа — теряется вся маржа, не больше */
+  return {o,e,tp,sl,qty,notional,fee,prof,loss,margin,lev,liq,liqFirst,roeP:margin>0?prof/margin*100:0,roeL:margin>0?Math.min(100,loss/margin*100):0,rr:loss>0?prof/loss:0}}
 /* магнит: точка прилипает к ближайшей цене свечи (открытие/макс/мин/закрытие), если палец рядом */
 function snapPt(P){if(!POS.mag||!series||!chart||P.t==null)return P;const l=chart.timeScale().coordinateToLogical(P.x);if(l==null)return P;const i=Math.round(l),k=candles[i];if(!k)return P;
   let best=null,bd=16;[k.o,k.h,k.l,k.c].forEach(v=>{const y=series.priceToCoordinate(v);if(y!=null&&Math.abs(y-P.y)<bd){bd=Math.abs(y-P.y);best={v,y}}});
@@ -2274,11 +2282,15 @@ function posDraw(d,a,b,c,right,sel){
     ox.fillStyle=res==='tp'?'#26a69a':'#ef5350';ox.beginPath();ox.arc(ex,ey,6,0,6.2832);ox.fill();ox.fillStyle='#fff';ox.font='800 9px system-ui';ox.textAlign='center';ox.textBaseline='middle';ox.fillText(res==='tp'?'✓':'✕',ex,ey)}}
   const tpUp=b.y<a.y,cx=x1+Math.min(w,right-x1)/2,$u=v=>o.usd?'  ·  '+v:'';
   if(o.compact){pill(['+'+pt.toFixed(2)+'%'+$u('+'+fmtUsd(K.prof))],cx,b.y+(tpUp?-14:14),'rgba(38,166,154,.95)','c');pill(['−'+ps.toFixed(2)+'%'+$u('−'+fmtUsd(K.loss))],cx,c.y+(tpUp?14:-14),'rgba(239,83,80,.95)','c')}
-  else{pill(['Цель '+tp.toFixed(prec)+'  +'+pt.toFixed(2)+'%'+$u('+'+fmtUsd(K.prof))],cx,b.y+(tpUp?-14:14),'rgba(38,166,154,.95)','c');
-    pill(['Стоп '+sl.toFixed(prec)+'  −'+ps.toFixed(2)+'%'+$u('−'+fmtUsd(K.loss))],cx,c.y+(tpUp?14:-14),'rgba(239,83,80,.95)','c')}
+  else{const roe=v=>K.lev>1?' ('+v+')':'';
+    pill(['Цель '+tp.toFixed(prec)+'  +'+pt.toFixed(2)+'%'+$u('+'+fmtUsd(K.prof)+roe('+'+K.roeP.toFixed(0)+'% маржи'))],cx,b.y+(tpUp?-14:14),'rgba(38,166,154,.95)','c');
+    pill([K.liqFirst?'⚠ Стоп за ликвидацией! Ликв. '+K.liq.toFixed(prec)+' · −'+fmtUsd(K.margin)+' (вся маржа)':'Стоп '+sl.toFixed(prec)+'  −'+ps.toFixed(2)+'%'+$u('−'+fmtUsd(K.loss)+roe('−'+K.roeL.toFixed(0)+'% маржи'))],cx,c.y+(tpUp?14:-14),K.liqFirst?'rgba(255,152,0,.97)':'rgba(239,83,80,.95)','c')}
+  /* линия ликвидации */
+  if(K.liq!=null){const yq=series.priceToCoordinate(K.liq);if(yq!=null&&yq>0&&yq<$('#main').clientHeight){ox.setLineDash([6,4]);ox.strokeStyle='#ff9800';ox.lineWidth=1.5;ox.beginPath();ox.moveTo(x1,yq);ox.lineTo(x2,yq);ox.stroke();ox.setLineDash([]);
+    ox.font='700 10.5px system-ui';ox.fillStyle='#ff9800';ox.textAlign='left';ox.textBaseline='bottom';ox.fillText('ликвидация '+K.liq.toFixed(prec),x1+4,yq-2)}}
   const st=res==='tp'?'✅ цель за '+nb+' свеч.':res==='sl'?'❌ стоп за '+nb+' свеч.':'сейчас '+(pnl>=0?'+':'')+pnl.toFixed(2)+'%'+(o.usd?' ('+(pnl$>=0?'+':'')+fmtUsd(pnl$)+')':'');
   const L=o.compact?[(lg?'LONG':'SHORT')+' · R/R '+K.rr.toFixed(2)+' · '+st]:[(lg?'LONG ':'SHORT ')+e.toFixed(prec)+'  ·  R/R '+K.rr.toFixed(2),
-    'Объём '+fmtUsd(K.notional)+' · '+(K.qty>=100?K.qty.toFixed(0):K.qty.toPrecision(3))+' монет'+(o.lev>1?' · маржа '+fmtUsd(K.margin)+' (x'+o.lev+')':''),st];
+    'Маржа '+fmtUsd(K.margin)+' × '+K.lev+' = позиция '+fmtUsd(K.notional),st];
   const side=right-x2>175,my=Math.abs(b.y-a.y)>(o.compact?40:70)?(a.y+b.y)/2:a.y;
   pill(L,side?x2+12:cx,side?a.y:my,res==='tp'?'rgba(38,166,154,.97)':res==='sl'?'rgba(239,83,80,.97)':'rgba(30,34,45,.95)',side?'l':'c');
   if(d.lock&&sel){ox.font='14px system-ui';ox.textAlign='center';ox.textBaseline='middle';ox.fillText('🔒',x1,a.y);return}
@@ -2312,10 +2324,12 @@ function openDset(){const d=DR[selD];if(!d)return;const el=$('#dset'),isP=d.k===
     h+='<div class="h">Цены</div><div class="grid"><label>Вход<input type="number" step="any" data-f="e" value="'+K.e.toFixed(prec)+'"></label><label>R/R<input type="number" value="'+K.rr.toFixed(2)+'" disabled></label>'
       +'<label>Цель (цена)<input type="number" step="any" data-f="tp" value="'+K.tp.toFixed(prec)+'"></label><label>Цель, %<input type="number" step="0.1" data-f="tpp" value="'+pc(K.tp).toFixed(2)+'"></label>'
       +'<label>Стоп (цена)<input type="number" step="any" data-f="sl" value="'+K.sl.toFixed(prec)+'"></label><label>Стоп, %<input type="number" step="0.1" data-f="slp" value="'+pc(K.sl).toFixed(2)+'"></label></div>'
-      +'<div class="h">Деньги</div><div class="grid"><label>Депозит, $<input type="number" step="any" data-o="dep" value="'+o.dep+'"></label>'
-      +'<label>Риск<div class="row"><input type="number" step="any" data-o="risk" value="'+o.risk+'" style="flex:1"><div class="seg"><button data-rm="%" class="'+(o.rmode==='%'?'on':'')+'">%</button><button data-rm="$" class="'+(o.rmode==='$'?'on':'')+'">$</button></div></div></label>'
+      +'<div class="h">Деньги</div><div class="row" style="margin-bottom:8px"><div class="seg"><button data-sm="mar" class="'+(o.smode!=='risk'?'on':'')+'">Сумма входа × плечо</button><button data-sm="risk" class="'+(o.smode==='risk'?'on':'')+'">По риску</button></div></div><div class="grid">'
+      +(o.smode==='risk'?'<label>Депозит, $<input type="number" step="any" data-o="dep" value="'+o.dep+'"></label>'
+      +'<label>Риск на стопе<div class="row"><input type="number" step="any" data-o="risk" value="'+o.risk+'" style="flex:1"><div class="seg"><button data-rm="%" class="'+(o.rmode==='%'?'on':'')+'">%</button><button data-rm="$" class="'+(o.rmode==='$'?'on':'')+'">$</button></div></div></label>'
+      :'<label>Сумма входа (маржа), $<input type="number" step="any" data-o="mar" value="'+o.mar+'"></label>')
       +'<label>Плечо, x<input type="number" min="1" max="125" step="1" data-o="lev" value="'+o.lev+'"></label><label>Комиссия, % за сделку<input type="number" step="0.01" data-o="fee" value="'+o.fee+'"></label></div>'
-      +'<div class="sum">Объём позиции: <b>'+fmtUsd(K.notional)+'</b> ('+(K.qty>=100?K.qty.toFixed(0):K.qty.toPrecision(4))+' монет)<br>Маржа: <b>'+fmtUsd(K.margin)+'</b> · комиссия: '+fmtUsd(K.fee)+'<br>Прибыль на цели: <b style="color:#26c68c">+'+fmtUsd(K.prof)+'</b> · убыток на стопе: <b style="color:#ff6b6b">−'+fmtUsd(K.loss)+'</b></div>'
+      +'<div class="sum">Маржа <b>'+fmtUsd(K.margin)+'</b> × плечо '+K.lev+' = позиция <b>'+fmtUsd(K.notional)+'</b> ('+(K.qty>=100?K.qty.toFixed(0):K.qty.toPrecision(4))+' монет) · комиссия '+fmtUsd(K.fee)+'<br>Прибыль на цели: <b style="color:#26c68c">+'+fmtUsd(K.prof)+'</b> (+'+K.roeP.toFixed(1)+'% к марже)<br>Убыток на стопе: <b style="color:#ff6b6b">−'+fmtUsd(K.loss)+'</b> (−'+K.roeL.toFixed(1)+'% к марже)'+(K.liq!=null?'<br>Ликвидация: <b style="color:#ff9800">'+K.liq.toFixed(prec)+'</b>'+(K.liqFirst?' — <b style="color:#ff9800">раньше стопа! Уменьшите плечо или поднимите стоп</b>':''):'')+'</div>'
       +'<div class="h">Вид</div><div class="row"><label class="ck"><input type="checkbox" data-c="compact"'+(o.compact?' checked':'')+'> Компактные подписи</label><label class="ck"><input type="checkbox" data-c="ext"'+(o.ext?' checked':'')+'> Продлить вправо</label><label class="ck"><input type="checkbox" data-c="usd"'+(o.usd?' checked':'')+'> Показывать $</label></div>'}
   h+='<div class="h">Цвет и линия</div><div class="row">'+DCOL.map(c=>'<button class="sw'+(c===d.c?' on':'')+'" data-sw="'+c+'" style="background:'+c+'"></button>').join('')+'</div>';
   if(!isP&&d.k!=='txt')h+='<div class="row" style="margin-top:8px"><div class="seg">'+[1,2,3,4].map(n=>'<button data-wd="'+n+'" class="'+((d.w||2)===n?'on':'')+'">'+n+' px</button>').join('')+'</div><div class="seg">'+LSTY.map((t,i)=>'<button data-ls="'+i+'" class="'+((d.ls||0)===i?'on':'')+'">'+t+'</button>').join('')+'</div></div>';
@@ -2333,7 +2347,8 @@ $('#dset').onchange=e=>{const d=DR[selD];if(!d)return;const t=e.target,v=+t.valu
   if(t.dataset.lk){d.lock=t.checked}
   saveDR();openDset();ctxShow()};
 $('#dset').onclick=e=>{const b=e.target.closest('button');if(!b)return;const d=DR[selD];if(b.dataset.x){closeDset();return}if(!d)return;
-  if(b.dataset.rm){d.o=Object.assign(d.o||{},{rmode:b.dataset.rm})}else if(b.dataset.sw){d.c=b.dataset.sw}else if(b.dataset.wd){d.w=+b.dataset.wd}else if(b.dataset.ls){d.ls=+b.dataset.ls}
+  if(b.dataset.sm){d.o=Object.assign(d.o||{},{smode:b.dataset.sm})}
+  else if(b.dataset.rm){d.o=Object.assign(d.o||{},{rmode:b.dataset.rm})}else if(b.dataset.sw){d.c=b.dataset.sw}else if(b.dataset.wd){d.w=+b.dataset.wd}else if(b.dataset.ls){d.ls=+b.dataset.ls}
   else if(b.dataset.def){Object.assign(POS,posO(d));savePos();toast('Сохранено: новые позиции будут с этими настройками');return}
   saveDR();openDset();ctxShow()};
 function renderDBar(){
@@ -2343,7 +2358,7 @@ function renderDBar(){
    +'<select id="dwid">'+[1,2,3,4].map(n=>'<option'+(n===dwid?' selected':'')+'>'+n+'</option>').join('')+'</select>'
    +'<input id="dtxt" placeholder="текст для T" value="'+esc(($('#dtxt')||{}).value||'')+'">'
    +'<button id="dmag" class="dt'+(POS.mag?' on':'')+'" title="Магнит">🧲<small>Магнит</small></button>'
-   +((tool==='long'||tool==='short'||(selD>=0&&DR[selD]&&/long|short/.test(DR[selD].k)))?'<label class="dpos">Депозит $<input id="pdep" type="number" min="1" value="'+POS.dep+'"></label><label class="dpos">Риск %<input id="prisk" type="number" min="0.1" step="0.1" value="'+POS.risk+'"></label>':'')
+   +((tool==='long'||tool==='short'||(selD>=0&&DR[selD]&&/long|short/.test(DR[selD].k)))?(()=>{const d=DR[selD],o=d&&/long|short/.test(d.k)?posO(d):POS;return '<label class="dpos">Вход $<input id="pmar" type="number" min="1" value="'+o.mar+'"></label><label class="dpos">Плечо x<input id="plev" type="number" min="1" max="125" step="1" value="'+o.lev+'"></label>'})():'')
    +(DR.some(d=>d.hid)?'<button id="dshow">👁 Показать скрытые ('+DR.filter(d=>d.hid).length+')</button>':'')
    +'<button id="ddel"'+(selD<0?' disabled':'')+'>🗑</button><button id="dclr">Очистить всё</button></div>'
    +(tool!=='cur'?'<span class="dhint">'+(tool==='long'||tool==='short'?'Нажмите на цену входа — цель и стоп поставятся сами, потом их можно перетащить за точки':tool==='ruler'?'Протяните пальцем по графику':NPT[tool]===1?'Нажмите на график':NPT[tool]===2?'Проведите пальцем от точки к точке':'Проведите линию, затем нажмите третью точку')+'</span>':'');
@@ -2355,7 +2370,7 @@ $('#dbar').onclick=e=>{const b=e.target.closest('button');if(!b)return;
   else if(b.id==='dmag'){POS.mag=!POS.mag;savePos();renderDBar()}
   else if(b.id==='ddel'){if(selD>=0){DR.splice(selD,1);selD=-1;saveDR();renderDBar()}}
   else if(b.id==='dclr'){if(!DR.length)return;if(b.dataset.ok){DR=[];selD=-1;saveDR();renderDBar()}else{b.dataset.ok=1;b.textContent='Точно? Нажмите ещё раз';setTimeout(()=>{if(b.isConnected){delete b.dataset.ok;b.textContent='Очистить всё'}},3000)}}};
-$('#dbar').onchange=e=>{if(e.target.id==='pdep'||e.target.id==='prisk'){const v=+e.target.value,k=e.target.id==='pdep'?'dep':'risk';if(v>0){POS[k]=v;savePos();const d=DR[selD];if(d&&/long|short/.test(d.k)){d.o=Object.assign(d.o||{},{[k]:v});saveDR()}}return}
+$('#dbar').onchange=e=>{if(e.target.id==='pmar'||e.target.id==='plev'){let v=+e.target.value;const k=e.target.id==='pmar'?'mar':'lev';if(k==='lev')v=Math.max(1,Math.min(125,Math.round(v)));if(v>0){POS[k]=v;POS.smode='mar';savePos();const d=DR[selD];if(d&&/long|short/.test(d.k)){d.o=Object.assign(d.o||{},{[k]:v,smode:'mar'});saveDR()}}return}
   if(e.target.id==='dwid'){dwid=+e.target.value;if(selD>=0){DR[selD].w=dwid;saveDR()}}};
 $('#dbar').oninput=e=>{if(e.target.id==='dtxt'&&selD>=0&&DR[selD].k==='txt'){DR[selD].txt=e.target.value.slice(0,80);saveDR()}};
 $('#drb').onclick=()=>{const v=$('#dbar').style.display!=='flex';$('#dbar').style.display=v?'flex':'none';$('#drb').classList.toggle('on',v);if(!v){tool='cur';pend=[];ruler=null}renderDBar()};
