@@ -2306,7 +2306,9 @@ function posDraw(d,a,b,c,right,sel){
   const st=res==='tp'?'✅ цель за '+nb+' свеч.':res==='sl'?'❌ стоп за '+nb+' свеч.':'сейчас '+(pnl>=0?'+':'')+pnl.toFixed(2)+'%'+(o.usd?' ('+(pnl$>=0?'+':'')+fmtUsd(pnl$)+')':'');
   const L=o.compact?[(lg?'LONG':'SHORT')+' · R/R '+K.rr.toFixed(2)+' · '+st]:[(lg?'LONG ':'SHORT ')+e.toFixed(prec)+'  ·  R/R '+K.rr.toFixed(2),
     'Маржа '+fmtUsd(K.margin)+' × '+K.lev+' = позиция '+fmtUsd(K.notional),st];
-  const side=right-x2>175,my=Math.abs(b.y-a.y)>(o.compact?40:70)?(a.y+b.y)/2:a.y;
+  /* главная надпись — за пределами позиции, сразу за подписью стопа (или цели), чтобы не закрывать свечи */
+  const th=L.length*15+6,H=$('#main').clientHeight-8,sd=tpUp?1:-1,yS2=c.y+sd*(25+6+th/2),yT2=b.y-sd*(25+6+th/2),fits=y=>y-th/2>46&&y+th/2<H;
+  let side=false,my;if(fits(yS2))my=yS2;else if(fits(yT2))my=yT2;else{side=right-x2>175;my=Math.abs(b.y-a.y)>(o.compact?40:70)?(a.y+b.y)/2:a.y}
   pill(L,side?x2+12:cx,side?a.y:my,res==='tp'?'rgba(38,166,154,.97)':res==='sl'?'rgba(239,83,80,.97)':'rgba(30,34,45,.95)',side?'l':'c');
   if(d.lock&&sel){ox.font='14px system-ui';ox.textAlign='center';ox.textBaseline='middle';ox.fillText('🔒',x1,a.y);return}
   if(sel){ox.fillStyle='#fff';ox.strokeStyle='#2962ff';ox.lineWidth=2;[a,{x:x1,y:b.y},{x:x1,y:c.y}].forEach(p=>{ox.beginPath();ox.arc(p.x,p.y,7,0,6.2832);ox.fill();ox.stroke()});
@@ -2321,7 +2323,7 @@ function ctxShow(){const el=$('#dctx'),d=DR[selD];if(!d||selD<0||d.hid||tool!=='
   el.style.display='flex';ctxPos()}
 function ctxPos(){const el=$('#dctx'),d=DR[selD];if(!d||el.style.display==='none')return;const P=d.p.map(scr).filter(p=>p.x!=null&&p.y!=null);if(!P.length)return;
   const M=$('#main'),W=M.clientWidth,H=M.clientHeight,ew=el.offsetWidth||260,eh=el.offsetHeight||44;let y=Math.min(...P.map(p=>p.y))-eh-16;if(d.k==='long'||d.k==='short'){const ys=P.map(p=>p.y);y=Math.min(...ys)-eh-34}
-  if(y<6)y=Math.max(...P.map(p=>p.y))+20;const x=Math.max(4,Math.min(W-ew-4,P.reduce((s,p)=>s+p.x,0)/P.length-ew/2));y=Math.max(4,Math.min(H-eh-4,y));
+  if(y<6)y=Math.max(...P.map(p=>p.y))+((d.k==='long'||d.k==='short')?(posO(d).compact?62:92):20);   /* у позиции — ниже её подписей, не поверх */const x=Math.max(4,Math.min(W-ew-4,P.reduce((s,p)=>s+p.x,0)/P.length-ew/2));y=Math.max(4,Math.min(H-eh-4,y));
   if(Math.abs((el._x||0)-x)>1||Math.abs((el._y||0)-y)>1){el._x=x;el._y=y;el.style.left=x+'px';el.style.top=y+'px'}}
 $('#dctx').addEventListener('pointerdown',e=>e.stopPropagation(),true);
 $('#dctx').onclick=e=>{const b=e.target.closest('button');if(!b)return;const d=DR[selD];if(!d)return;const a=b.dataset.a;
