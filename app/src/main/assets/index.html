@@ -208,7 +208,7 @@ select,input{outline:none}select:focus,input:focus{border-color:var(--ac)}
 #szp .szt{display:flex;align-items:center;gap:8px;margin-bottom:4px}#szp .szt b{flex:1;font-size:13px}
 #szp .szt button,#szp .szs button{background:#1a1f2b;border:1px solid #2a3142;color:#d6dae3;border-radius:9px;min-width:34px;height:30px;font-size:16px;font-weight:700}
 #szp .szs{margin-top:8px}#szp .szs div{display:flex;align-items:center;gap:8px;margin-top:3px}#szp .szs label{display:flex;justify-content:space-between;color:#8b93a7}#szp .szs label b{color:#ffab91}
-#szp input[type=range]{flex:1;accent-color:#ff7043;height:28px}#szp .szk{display:flex;gap:14px;margin-top:8px;flex-wrap:wrap}#szp .szk label{display:flex;gap:5px;align-items:center}
+#szp input[type=range]{flex:1;accent-color:#ff7043;height:28px}#szp .szhint{font-size:11.5px;color:#7d8597;line-height:1.35;margin:2px 2px 4px}#szp .szk{display:flex;gap:14px;margin-top:8px;flex-wrap:wrap}#szp .szk label{display:flex;gap:5px;align-items:center}
 #szp .sw{position:relative;width:44px;height:24px;border-radius:12px;background:#2a3142;border:0;min-width:0!important}#szp .sw:after{content:'';position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#8b93a7;transition:.2s}#szp .sw.on{background:#ff7043}#szp .sw.on:after{left:23px;background:#fff}
 #panel,#ipanel,#dbar{background:var(--pn);border-bottom:1px solid var(--ln)}
 #panel .sec{background:var(--cd);border:1px solid var(--ln);border-radius:14px}
@@ -1776,12 +1776,16 @@ const WSTEP=[0,5e3,1e4,25e3,5e4,1e5,25e4,5e5,1e6,25e5,5e6,1e7];
 const SZS=[['dist','Скрыть зоны ближе к цене, чем',0,50,.1,v=>v?cm(v.toFixed(1))+'%':'не скрывать'],
   ['whale','Учитывать китов от',0,WSTEP.length-1,1,v=>WSTEP[v]?fmtM(WSTEP[v],1):'все заявки'],
   ['sc','Минимальная сила зоны',0,95,5,v=>v],['n','Зон с каждой стороны',1,6,1,v=>v]];
+const SZHINT={dist:'Зоны, которые стоят совсем рядом с ценой, скрываются. Например, 2% — видны только зоны дальше 2% от текущей цены. Удобно смотреть дальние цели и не отвлекаться на ближние.',
+  whale:'Заявки в стакане меньше этой суммы не учитываются. Чем выше значение, тем больше остаются только крупные игроки (киты), а мелкие заявки не создают ложных зон.',
+  sc:'Сила зоны от 0 до 100 — насколько вероятно, что цена там остановится (крупные заявки, прошлые объёмы и развороты). Зоны слабее этого числа скрываются.',
+  n:'Сколько ближайших зон показывать над ценой (сопротивления) и под ценой (поддержки). Меньше — чище график.'};
 const szFilter=Z=>[true,false].flatMap(u=>(u?SZC.up:SZC.dn)?Z.filter(z=>z.up===u&&z.sc>=SZC.sc&&Math.abs(z.d)>=SZC.dist).slice(0,SZC.n):[]);
 const szWhale=a=>{const m=WSTEP[SZC.whale]||0;return m?a.filter(x=>x[1]>=m):a};
 function renderSZP(){const on=S.sz!==false;
   $('#szp').innerHTML='<div class="szt"><b>🛑 Где цена может остановиться</b><button class="sw'+(on?' on':'')+'" id="szon"></button><button id="szx">✕</button></div>'
-    +SZS.map(([k,l,a,b,st,f])=>'<div class="szs"><label>'+l+' <b id="szv_'+k+'">'+f(SZC[k])+'</b></label><div><button data-m="'+k+'">−</button><input type="range" id="szr_'+k+'" min="'+a+'" max="'+b+'" step="'+st+'" value="'+SZC[k]+'"><button data-p="'+k+'">+</button></div></div>').join('')
-    +'<div class="szk"><label><input type="checkbox" id="szup"'+(SZC.up?' checked':'')+'> 🔴 Сопротивления (выше цены)</label><label><input type="checkbox" id="szdn"'+(SZC.dn?' checked':'')+'> 🟢 Поддержки (ниже цены)</label></div>'
+    +SZS.map(([k,l,a,b,st,f])=>'<div class="szs"><label>'+l+' <b id="szv_'+k+'">'+f(SZC[k])+'</b></label><div><button data-m="'+k+'">−</button><input type="range" id="szr_'+k+'" min="'+a+'" max="'+b+'" step="'+st+'" value="'+SZC[k]+'"><button data-p="'+k+'">+</button></div><div class="szhint">'+SZHINT[k]+'</div></div>').join('')
+    +'<div class="szhint" style="margin-top:8px">🔴 Красные зоны — выше цены: там рост может остановиться. 🟢 Зелёные — ниже цены: там может остановиться падение.</div><div class="szk"><label><input type="checkbox" id="szup"'+(SZC.up?' checked':'')+'> 🔴 Сопротивления (выше цены)</label><label><input type="checkbox" id="szdn"'+(SZC.dn?' checked':'')+'> 🟢 Поддержки (ниже цены)</label></div>'
     +'<div class="szt" style="margin-top:8px"><span style="flex:1;color:#6c7488;font-size:11px">Работает и на графике, и в карточке монеты</span><button id="szrst" style="font-size:12px;padding:0 10px">Сбросить</button></div>'}
 function setSZ(k,v){const d=SZS.find(x=>x[0]===k);v=Math.max(d[2],Math.min(d[3],Math.round(v/d[4])*d[4]));SZC[k]=+v.toFixed(2);LS.set('cbSZ',SZC);
   const r=$('#szr_'+k);if(r)r.value=SZC[k];const t=$('#szv_'+k);if(t)t.textContent=d[5](SZC[k]);szT=0;CSZ.t=0}
