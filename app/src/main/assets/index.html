@@ -2156,9 +2156,12 @@ const drKey=()=>'cbDr:'+CM+':'+cur;
 function loadDR(){try{DR=JSON.parse(localStorage.getItem(drKey())||'[]')}catch(e){DR=[]}selD=-1;pend=[];hov=null;ruler=null;renderDBar();if($('#dctx'))ctxShow();if($('#dset'))closeDset()}
 function saveDR(){try{localStorage.setItem(drKey(),JSON.stringify(DR))}catch(e){}}
 function barSec(){const a=candles,n=a.length;return n>1?a[n-1].t-a[n-2].t:60}
-function t2x(t){const A=candles,an=A.length;if(!an||!chart)return null;const ts=chart.timeScale(),d=barSec();
-  if(t<=A[0].t)return ts.logicalToCoordinate((t-A[0].t)/d);if(t>=A[an-1].t)return ts.logicalToCoordinate(an-1+(t-A[an-1].t)/d);
-  let lo=0,hi=an-1;while(hi-lo>1){const m=(lo+hi)>>1;A[m].t<=t?lo=m:hi=m}return ts.logicalToCoordinate(lo+(t-A[lo].t)/(A[hi].t-A[lo].t))}
+/* время → x на экране. Библиотека переводит в координату только ЦЕЛЫЙ номер свечи (дробный даёт пусто),
+   поэтому дробную позицию считаем сами между соседними свечами — иначе рисунок с другого таймфрейма уезжает в край */
+function lx(l){const ts=chart.timeScale(),i=Math.floor(l),f=l-i,x0=ts.logicalToCoordinate(i);if(x0==null)return null;if(!f)return x0;const x1=ts.logicalToCoordinate(i+1);return x1==null?x0:x0+(x1-x0)*f}
+function t2x(t){const A=candles,an=A.length;if(!an||!chart||t==null)return null;const d=barSec();
+  if(t<=A[0].t)return lx((t-A[0].t)/d);if(t>=A[an-1].t)return lx(an-1+(t-A[an-1].t)/d);
+  let lo=0,hi=an-1;while(hi-lo>1){const m=(lo+hi)>>1;A[m].t<=t?lo=m:hi=m}return lx(lo+(t-A[lo].t)/(A[hi].t-A[lo].t))}
 function x2t(x){const A=candles,an=A.length;if(!an||!chart)return null;const l=chart.timeScale().coordinateToLogical(x);if(l==null)return null;const d=barSec();
   if(l<=0)return A[0].t+l*d;if(l>=an-1)return A[an-1].t+(l-an+1)*d;const i=Math.floor(l);return A[i].t+(l-i)*(A[i+1].t-A[i].t)}
 function evPt(e){const r=$('#main').getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;return {x,y,t:x2t(x),v:series?series.coordinateToPrice(y):null}}
