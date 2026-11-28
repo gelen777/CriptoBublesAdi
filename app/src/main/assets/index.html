@@ -2344,23 +2344,31 @@ function openDset(){const d=DR[selD];if(!d)return;const el=$('#dset'),isP=d.k===
       +'<label>Риск на стопе<div class="row"><input type="number" step="any" data-o="risk" value="'+o.risk+'" style="flex:1"><div class="seg"><button data-rm="%" class="'+(o.rmode==='%'?'on':'')+'">%</button><button data-rm="$" class="'+(o.rmode==='$'?'on':'')+'">$</button></div></div></label>'
       :'<label>Сумма входа (маржа), $<input type="number" step="any" data-o="mar" value="'+o.mar+'"></label>')
       +'<label>Плечо, x<input type="number" min="1" max="125" step="1" data-o="lev" value="'+o.lev+'"></label><label>Комиссия, % за сделку<input type="number" step="0.01" data-o="fee" value="'+o.fee+'"></label></div>'
-      +'<div class="sum">Маржа <b>'+fmtUsd(K.margin)+'</b> × плечо '+K.lev+' = позиция <b>'+fmtUsd(K.notional)+'</b> ('+(K.qty>=100?K.qty.toFixed(0):K.qty.toPrecision(4))+' монет) · комиссия '+fmtUsd(K.fee)+'<br>Прибыль на цели: <b style="color:#26c68c">+'+fmtUsd(K.prof)+'</b> (+'+K.roeP.toFixed(1)+'% к марже)<br>Убыток на стопе: <b style="color:#ff6b6b">−'+fmtUsd(K.loss)+'</b> (−'+K.roeL.toFixed(1)+'% к марже)'+(K.liq!=null?'<br>Ликвидация: <b style="color:#ff9800">'+K.liq.toFixed(prec)+'</b>'+(K.liqFirst?' — <b style="color:#ff9800">раньше стопа! Уменьшите плечо или поднимите стоп</b>':''):'')+'</div>'
+      +posSum(K)
       +'<div class="h">Вид</div><div class="row"><label class="ck"><input type="checkbox" data-c="compact"'+(o.compact?' checked':'')+'> Компактные подписи</label><label class="ck"><input type="checkbox" data-c="ext"'+(o.ext?' checked':'')+'> Продлить вправо</label><label class="ck"><input type="checkbox" data-c="usd"'+(o.usd?' checked':'')+'> Показывать $</label></div>'}
   h+='<div class="h">Цвет и линия</div><div class="row">'+DCOL.map(c=>'<button class="sw'+(c===d.c?' on':'')+'" data-sw="'+c+'" style="background:'+c+'"></button>').join('')+'</div>';
   if(!isP&&d.k!=='txt')h+='<div class="row" style="margin-top:8px"><div class="seg">'+[1,2,3,4].map(n=>'<button data-wd="'+n+'" class="'+((d.w||2)===n?'on':'')+'">'+n+' px</button>').join('')+'</div><div class="seg">'+LSTY.map((t,i)=>'<button data-ls="'+i+'" class="'+((d.ls||0)===i?'on':'')+'">'+t+'</button>').join('')+'</div></div>';
   h+='<div class="row" style="margin-top:12px"><label class="ck"><input type="checkbox" data-lk="1"'+(d.lock?' checked':'')+'> 🔒 Закрепить (нельзя сдвинуть)</label></div>';
   if(isP)h+='<div class="row" style="margin-top:10px"><button class="sb" data-def="1">Сделать эти деньги/вид по умолчанию</button></div>';
   el.innerHTML=h;el.style.display='block'}
+function posSum(K){return '<div class="sum">Маржа <b>'+fmtUsd(K.margin)+'</b> × плечо '+K.lev+' = позиция <b>'+fmtUsd(K.notional)+'</b> ('+(K.qty>=100?K.qty.toFixed(0):K.qty.toPrecision(4))+' монет) · комиссия '+fmtUsd(K.fee)+'<br>Прибыль на цели: <b style="color:#26c68c">+'+fmtUsd(K.prof)+'</b> (+'+K.roeP.toFixed(1)+'% к марже)<br>Убыток на стопе: <b style="color:#ff6b6b">−'+fmtUsd(K.loss)+'</b> (−'+K.roeL.toFixed(1)+'% к марже)'+(K.liq!=null?'<br>Ликвидация: <b style="color:#ff9800">'+K.liq.toFixed(prec)+'</b>'+(K.liqFirst?' — <b style="color:#ff9800">раньше стопа! Уменьшите плечо или поднимите стоп</b>':''):'')+'</div>'}
+/* после изменения поля — обновляем только зависимые поля и итог, НЕ пересоздаём окно:
+   иначе следующее поле, в которое вы нажали, исчезало вместе с набранным числом */
+function dsetRefresh(){const d=DR[selD],el=$('#dset');if(!d||!/long|short/.test(d.k)){openDset();return}const K=posCalc(d),pc=v=>Math.abs(v/K.e-1)*100,ae=document.activeElement;
+  const setv=(sel,v)=>{const x=el.querySelector(sel);if(x&&x!==ae)x.value=v};
+  setv('[data-f="e"]',K.e.toFixed(prec));setv('[data-f="tp"]',K.tp.toFixed(prec));setv('[data-f="sl"]',K.sl.toFixed(prec));setv('[data-f="tpp"]',pc(K.tp).toFixed(2));setv('[data-f="slp"]',pc(K.sl).toFixed(2));
+  const rr=el.querySelector('input[disabled]');if(rr)rr.value=K.rr.toFixed(2);const sm=el.querySelector('.sum');if(sm)sm.outerHTML=posSum(K)}
 function closeDset(){$('#dset').style.display='none'}
 $('#dset').addEventListener('pointerdown',e=>e.stopPropagation(),true);
-$('#dset').onchange=e=>{const d=DR[selD];if(!d)return;const t=e.target,v=+t.value,lg=d.k==='long';
+$('#dset').addEventListener('input',e=>{const t=e.target;if((t.dataset.o||t.dataset.f)&&t.value!==''&&+t.value>0)$('#dset').onchange(e)});   /* пустое поле при наборе не сбрасывает значение */
+$('#dset').onchange=e=>{const d=DR[selD];if(!d)return;const t=e.target,v=+t.value,lg=d.k==='long';if((t.dataset.o||t.dataset.f)&&(t.value===''||!(v>0)&&t.dataset.o!=='fee')){dsetRefresh();return}
   if(t.dataset.f&&v>0){const e0=d.p[0].v;if(t.dataset.f==='e'){const dtp=d.p[1].v-e0,dsl=d.p[2].v-e0;d.p[0].v=v;d.p[1].v=v+dtp;d.p[2].v=v+dsl}
     else if(t.dataset.f==='tp')d.p[1].v=v;else if(t.dataset.f==='sl')d.p[2].v=v;
     else if(t.dataset.f==='tpp')d.p[1].v=e0*(1+(lg?1:-1)*v/100);else if(t.dataset.f==='slp')d.p[2].v=e0*(1-(lg?1:-1)*v/100)}
   if(t.dataset.o&&v>=0){d.o=Object.assign(d.o||{},{[t.dataset.o]:t.dataset.o==='lev'?Math.max(1,Math.round(v)):v})}
   if(t.dataset.c){d.o=Object.assign(d.o||{},{[t.dataset.c]:t.checked})}
   if(t.dataset.lk){d.lock=t.checked}
-  saveDR();openDset();ctxShow()};
+  saveDR();dsetRefresh();ctxShow()};
 $('#dset').onclick=e=>{const b=e.target.closest('button');if(!b)return;const d=DR[selD];if(b.dataset.x){closeDset();return}if(!d)return;
   if(b.dataset.sm){d.o=Object.assign(d.o||{},{smode:b.dataset.sm})}
   else if(b.dataset.rm){d.o=Object.assign(d.o||{},{rmode:b.dataset.rm})}else if(b.dataset.sw){d.c=b.dataset.sw}else if(b.dataset.wd){d.w=+b.dataset.wd}else if(b.dataset.ls){d.ls=+b.dataset.ls}
